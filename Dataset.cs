@@ -82,12 +82,13 @@ public class Dataset {
     }
 
     public static Dataset load_from_url(string url) {
-        var uri  = new Uri(url);
         const string cache_dir = "../../../.cache/";
-        var filename = $"{cache_dir}/{uri.Segments[^1]}";
 
-        if(!Directory.Exists(cache_dir))
+        if (!Directory.Exists(cache_dir)) {
             Directory.CreateDirectory(cache_dir);
+        }
+
+        var filename = $"{cache_dir}/{new Uri(url).Segments[^1]}";
 
         if (!File.Exists(filename)) {
             var data = read_url(url);
