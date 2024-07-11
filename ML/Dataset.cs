@@ -1,6 +1,6 @@
 namespace NetML;
 
-public class Dataset {
+public sealed class Dataset {
     public readonly float[][] inputs;
     public readonly string[] labels;
     public readonly float[][] outputs;
@@ -13,25 +13,15 @@ public class Dataset {
     }
 
     public string name { get; }
-    public int sample_count => inputs.Length;
+    public int length => inputs.Length;
 
-    public Record this[int sample] {
+    public Sample this[int sample] {
         get {
             for (var i = 0; i < outputs.Length; ++i)
                 if (outputs[sample][i] != 0f)
-                    return new(inputs[sample], i);
+                    return new(inputs[sample], outputs[sample], i);
 
             throw new KeyNotFoundException(sample.ToString());
-        }
-    }
-
-    public IEnumerable<Record> samples {
-        get {
-            for (var s = 0; s < inputs.Length; ++s) {
-                for (var i = 0; i < outputs.Length; ++i)
-                    if (outputs[s][i] != 0f)
-                        yield return new(inputs[s], i);
-            }
         }
     }
 
@@ -100,12 +90,12 @@ public class Dataset {
 
     public static Dataset load_from_file(string file_path, float sample_percent = 1f, string[]? labels = null) {
         var lines = File.ReadAllLines(file_path);
-        var sample_count = (int)((lines.Length - 1) * sample_percent);
+        var sample_count = (int)(lines.Length * sample_percent);
         var inputs       = new float[sample_count][];
         var outputs      = new float[sample_count][];
 
         for (var i = 0; i < sample_count; i++) {
-            var values = lines[i + 1].Split(',').Select(float.Parse).ToArray();
+            var values = lines[i].Split(',').Select(float.Parse).ToArray();
             inputs[i] = values.Skip(1).Select(static x => x / 255.0f).ToArray(); // Normalize pixel values
             outputs[i] = new float[10];
             outputs[i][(int)values[0]] = 1.0f; // One-hot encode the label
@@ -114,11 +104,21 @@ public class Dataset {
         return new(file_path, inputs, outputs, labels ?? ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
     }
 
-    public readonly struct Record(float[] data, int label) {
+    public readonly ref struct Sample {
+        public ReadOnlySpan<float> input { get;}
+        public ReadOnlySpan<float> output { get; }
+        public int label { get; }
+
+        public Sample(Span<float> input, Span<float> output, int label) {
+            this.input = input;
+            this.output = output;
+            this.label = label;
+        }
+
         public override string ToString() {
             var s = "";
             for (var y = 0; y < 28; ++y) {
-                for (var x = 0; x < 28; ++x) s += $"{format(data[x + y * 28])}";
+                for (var x = 0; x < 28; ++x) s += $"{format(input[x + y * 28])}";
 
                 s += "\n";
             }
