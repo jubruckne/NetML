@@ -2,8 +2,19 @@
 using NetML;
 using NetML.ML;
 
-Console.WriteLine($"Vector64<float>.IsSupported: {Vector64<float>.IsSupported}");
-Console.WriteLine($"Vector128<float>.IsSupported: {Vector128<float>.IsSupported}");
+Console.WriteLine($"AdvSimd.IsSupported: {AdvSimd.IsSupported}");
+Console.WriteLine($"X86.Avx.IsSupported: {System.Runtime.Intrinsics.X86.Avx.IsSupported}");
+Console.WriteLine($"X86.Avx2.IsSupported: {System.Runtime.Intrinsics.X86.Avx2.IsSupported}");
+Console.WriteLine($"X86.Fma.IsSupported: {System.Runtime.Intrinsics.X86.Fma.IsSupported}");
+Console.WriteLine($"X86.Sse41.IsSupported: {System.Runtime.Intrinsics.X86.Sse41.IsSupported}");
+Console.WriteLine($"X86.Sse42.IsSupported: {System.Runtime.Intrinsics.X86.Sse42.IsSupported}");
+Console.WriteLine();
+Console.WriteLine($"Vector64<float> IsSupported: {Vector64<float>.IsSupported}, IsHardwareAccelerated:{Vector64.IsHardwareAccelerated}");
+Console.WriteLine($"Vector128<float> IsSupported: {Vector128<float>.IsSupported}, IsHardwareAccelerated:{Vector128.IsHardwareAccelerated}");
+Console.WriteLine($"Vector256<float> IsSupported: {Vector256<float>.IsSupported}, IsHardwareAccelerated:{Vector256.IsHardwareAccelerated}");
+Console.WriteLine($"Vector512<float> IsSupported: {Vector512<float>.IsSupported}, IsHardwareAccelerated:{Vector512.IsHardwareAccelerated}");
+Console.WriteLine();
+
 
 //var ds = Dataset.load(DatasetType.Cifar10_Train);
 //ds.shuffle(Random.Shared);

@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.Arm;
 
 namespace NetML.ML;
 
@@ -128,7 +127,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < input_length; j += 4) {
                 var left_vec = Vector128.LoadAligned(left_ptr + i * input_length + j);
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
-                sum = AdvSimd.FusedMultiplyAdd(sum, left_vec, right_vec);
+                sum = Vector128.FusedMultiplyAdd(sum, left_vec, right_vec);
             }
 
             result_ptr[i] = Vector128.Sum(sum);
@@ -149,7 +148,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < right_length; j += 4) {
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
                 var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
-                var p         = AdvSimd.FusedMultiplyAdd(v, right_vec, left_value);
+                var p         = Vector128.FusedMultiplyAdd(v, right_vec, left_value);
                 p.StoreAligned(data_ptr + i * right_length + j);
             }
         }
@@ -169,7 +168,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < right_length; j += 4) {
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
                 var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
-                var p         = AdvSimd.FusedMultiplyAdd(v, right_vec, left_value);
+                var p         = Vector128.FusedMultiplyAdd(v, right_vec, left_value);
                 p.StoreAligned(data_ptr + i * right_length + j);
             }
         }
