@@ -2,7 +2,7 @@
 using NetML;
 using NetML.ML;
 
-Console.WriteLine($"Vector128<float>.IsSupported: {Vector64<float>.IsSupported}");
+Console.WriteLine($"Vector64<float>.IsSupported: {Vector64<float>.IsSupported}");
 Console.WriteLine($"Vector128<float>.IsSupported: {Vector128<float>.IsSupported}");
 
 //var ds = Dataset.load(DatasetType.Cifar10_Train);
