@@ -8,27 +8,38 @@ public sealed class Layer: IDisposable {
     public Matrix weights { get; }
     public Vector biases { get; }
 
-    private readonly Vector inputs;
-    private readonly Vector outputs;
+    private readonly Matrix inputs;
+    private readonly Matrix outputs;
+
     private readonly Vector output_errors;
     private readonly Vector output_derivatives;
     private readonly Vector input_gradients;
 
+    // Accumulators for gradients
+    private readonly Matrix weight_gradients;
+    private readonly Vector bias_gradients;
+
     public int input_size => weights.input_count;
     public int output_size => weights.output_count;
 
-    public Layer(string name, int input_size, int output_size) {
+    public Layer(string name, int input_size, int output_size, int batch_size) {
         // output = rows
         // input = columns
         this.name = name;
         this.weights = new Matrix("weighs", output_size, input_size);
         this.biases = new Vector("biases", output_size);
-        this.outputs = new Vector("outputs", output_size);
 
-        this.inputs = new Vector("inputs", input_size);
+        this.inputs = new Matrix("inputs", batch_size, input_size);
+        this.outputs = new Matrix("outputs", batch_size, output_size);
+
         this.output_derivatives = new Vector("derivatives", output_size);
         this.output_errors = new Vector("errors", output_size);
         this.input_gradients = new Vector("input_gradients", input_size);
+
+        this.weight_gradients = new Matrix("weigh_gradients", output_size, input_size);
+        this.bias_gradients  = new Vector("bias_gradients", output_size);
+        weight_gradients.clear();
+        bias_gradients.clear();
     }
 
     public void initialize_weights(Random rand) {
@@ -45,7 +56,7 @@ public sealed class Layer: IDisposable {
         }
     }
 
-    public Vector forward(Vector inputs) {
+    public Vector forward(Matrix inputs) {
         this.inputs.load(inputs.as_span());
 
         // Console.WriteLine($"\n{name}_forward");
@@ -59,7 +70,7 @@ public sealed class Layer: IDisposable {
         return outputs;
     }
 
-    public Vector backward(Vector output_gradients, float learning_rate) {
+    public Vector backward(Vector output_gradients) {
         // Console.WriteLine($"\n{name}_backward");
 
         // Calculate the derivative of the outputs
@@ -69,10 +80,21 @@ public sealed class Layer: IDisposable {
         Vector.multiply_elementwise(output_gradients, output_derivatives, output_errors);
         Vector.dot(weights, output_gradients, input_gradients);
 
-        weights.add_outer_product_weighted(output_errors, inputs, learning_rate);
-        biases.add_elementwise_weighted(output_errors, learning_rate);
+        //weights.add_outer_product_weighted(output_errors, inputs, 0.009f);
+        //biases.add_elementwise_weighted(output_errors, 0.009f);
+
+        weight_gradients.add_outer_product(output_errors, inputs);
+        bias_gradients.add_elementwise(output_errors);
 
         return input_gradients;
+    }
+
+    public void apply_gradients(float learning_rate, int batch_size) {
+        weights.add_elementwise_weighted(weight_gradients, learning_rate);
+        biases.add_elementwise_weighted(bias_gradients, learning_rate);
+
+        weight_gradients.clear();
+        bias_gradients.clear();
     }
 
     public void Dispose() {
@@ -83,5 +105,7 @@ public sealed class Layer: IDisposable {
         output_errors.Dispose();
         input_gradients.Dispose();
         inputs.Dispose();
+        weight_gradients.Dispose();
+        bias_gradients.Dispose();
     }
 }

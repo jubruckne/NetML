@@ -6,20 +6,15 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <Platforms>ARM64</Platforms>
-        <Optimize>true</Optimize>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <Optimize>false</Optimize>
+        <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
-    <ItemGroup>
-      <Compile Remove=".cache\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <EmbeddedResource Remove=".cache\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove=".cache\**" />
-    </ItemGroup>
-
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <Optimize>true</Optimize>
+        <DebugSymbols>false</DebugSymbols>
+    </PropertyGroup>
 </Project>

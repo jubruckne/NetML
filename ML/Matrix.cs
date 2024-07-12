@@ -10,9 +10,9 @@ public sealed unsafe class Matrix: IDisposable {
     public string name { get; }
     public int output_count { get; } // rows
     public int input_count { get; }  // columns
+    public float* data { get; }
+    public int linear_length { get; }
 
-    private readonly float* data;
-    private readonly int linear_length;
     private int allocated;
 
     public Matrix(string name, int output_count, int input_count) {
@@ -20,8 +20,17 @@ public sealed unsafe class Matrix: IDisposable {
         this.output_count    = output_count;
         this.input_count = input_count;
         this.linear_length = output_count * input_count;
+
+        if(linear_length % 4 != 0) throw new ArgumentException($"length must be divisible by 4: {linear_length}");
+
         this.data = (float*)NativeMemory.AlignedAlloc((UIntPtr)(linear_length * sizeof(float)), 16);
         this.allocated = 1;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void load(ReadOnlySpan<float> data) {
+        if(data.Length != linear_length) throw new IndexOutOfRangeException($"{data.Length} != {linear_length}");
+        data.CopyTo(as_span());
     }
 
     public float this[int output_idx, int input_idx] {
@@ -41,6 +50,33 @@ public sealed unsafe class Matrix: IDisposable {
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Vector view(int dim, int idx) {
+        if(dim == 0)
+            return new Vector($"{name}[{idx}]", output_count, data + idx * input_count);
+
+        throw new NotImplementedException($"dim > 0 not implemented!");
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void clear() => as_span().Clear();
+
+    public void add_elementwise_weighted(Matrix other, float weight) {
+        if (input_count != other.input_count) throw new Exception($"input_count != other.input_count");
+        if (output_count != other.output_count) throw new Exception($"output_count != other.output_count");
+
+        var linear_length = this.linear_length;
+        var data_ptr = data;
+        var other_ptr = other.data;
+
+        for (var i = 0; i < linear_length; i += 4) {
+            var v = Vector128.LoadAligned(data_ptr + i);
+            var o = Vector128.LoadAligned(other_ptr + i);
+            var m = v + o * weight;
+            m.StoreAligned(data_ptr + i);
+        }
+    }
+
     public void add_elementwise(Matrix other) {
         if (input_count != other.input_count) throw new Exception($"input_count != other.input_count");
         if (output_count != other.output_count) throw new Exception($"output_count != other.output_count");
@@ -53,6 +89,26 @@ public sealed unsafe class Matrix: IDisposable {
         }
     }
 
+    public void multiply_elementwise(float x) {
+        if(linear_length % 4 != 0) throw new Exception($"linear_length % 4 != 0");
+
+        for (var i = 0; i < linear_length; i += 4) {
+            var v = Vector128.LoadAligned(data + i);
+            var m = v * x;
+            m.StoreAligned(data + i);
+        }
+    }
+
+    public void divide_elementwise(float x) {
+        if(linear_length % 4 != 0) throw new Exception($"linear_length % 4 != 0");
+
+        for (var i = 0; i < linear_length; i += 4) {
+            var v = Vector128.LoadAligned(data + i);
+            var m = v / x;
+            m.StoreAligned(data + i);
+        }
+    }
+
     public static void multiply(Matrix left, Vector right, Vector result) {
         if (left.input_count != right.length)
             throw new Exception($"{right.name} must have length of {left.name} columns!");
@@ -60,74 +116,67 @@ public sealed unsafe class Matrix: IDisposable {
             throw new Exception($"{result.name} must have length of {left.name} rows!");
 
         var left_ptr = left.data;
-        var right_ptr = right.get_pointer();
-        var result_ptr = result.get_pointer();
+        var right_ptr = right.data;
+        var result_ptr = result.data;
 
-        for (var i = 0; i < left.output_count; i++) {
+        var output_length = left.output_count;
+        var input_length = left.input_count;
+
+        for (var i = 0; i < output_length; i++) {
             var sum = Vector128<float>.Zero;
 
-            // Process 4 elements at a time
-            for (var j = 0; j < left.input_count; j += 4) {
-                var left_vec = Vector128.LoadAligned(left_ptr + i * left.input_count + j);
+            for (var j = 0; j < input_length; j += 4) {
+                var left_vec = Vector128.LoadAligned(left_ptr + i * input_length + j);
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
                 sum = AdvSimd.FusedMultiplyAdd(sum, left_vec, right_vec);
             }
 
-            // Sum the 4 elements of the vector
             result_ptr[i] = Vector128.Sum(sum);
         }
     }
 
-    public void add_outer_product_weighted(Vector left, Vector right, float weight) {
-        var left_ptr   = left.get_pointer();
-        var right_ptr  = right.get_pointer();
+    public void add_outer_product(Vector left, Vector right) {
+        var left_ptr  = left.data;
+        var right_ptr = right.data;
+        var data_ptr = data;
 
-        for (var i = 0; i < left.length; i++) {
-            var left_value = Vector128.Create(left_ptr[i] * weight);
-
-            for (var j = 0; j < right.length; j += 4) {
-                var right_vec = Vector128.LoadAligned(right_ptr + j);
-                var v = Vector128.LoadAligned(data + i * right.length + j);
-                var p = AdvSimd.FusedMultiplyAdd(v, right_vec, left_value);
-                p.StoreAligned(data + i * right.length + j);
-            }
-        }
-    }
-
-    public static Matrix outer_product_weighted(Vector left, Vector right, float weight) {
-        var left_length  = left.length;
+        var left_length = left.length;
         var right_length = right.length;
 
-        var result = new Matrix($"{left.name} x {right.name}", left_length, right_length);
-
-        var left_ptr   = left.get_pointer();
-        var right_ptr  = right.get_pointer();
-        var result_ptr = result.data;
-
         for (var i = 0; i < left_length; i++) {
-            var left_value = left_ptr[i] * weight;
+            var left_value = Vector128.Create(left_ptr[i]);
 
             for (var j = 0; j < right_length; j += 4) {
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
-                var product  = right_vec * left_value;
-                product.StoreAligned(result_ptr + i * right_length + j);
+                var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
+                var p         = AdvSimd.FusedMultiplyAdd(v, right_vec, left_value);
+                p.StoreAligned(data_ptr + i * right_length + j);
             }
         }
-
-        return result;
     }
 
-    public Matrix transpose() {
-        var transposed = new Matrix(name + "[transposed]", input_count, output_count);
+    public void add_outer_product_weighted(Vector left, Vector right, float weight) {
+        var left_ptr  = left.data;
+        var right_ptr = right.data;
+        var data_ptr  = data;
 
-        for (var o = 0; o < output_count; o++) {
-            for (var i = 0; i < input_count; i++) {
-                transposed[i, o] = this[o, i];
+        var left_length  = left.length;
+        var right_length = right.length;
+
+        for (var i = 0; i < left_length; i++) {
+            var left_value = Vector128.Create(left_ptr[i] * weight);
+
+            for (var j = 0; j < right_length; j += 4) {
+                var right_vec = Vector128.LoadAligned(right_ptr + j);
+                var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
+                var p         = AdvSimd.FusedMultiplyAdd(v, right_vec, left_value);
+                p.StoreAligned(data_ptr + i * right_length + j);
             }
         }
-
-        return transposed;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<float> as_span() => new Span<float>(data, linear_length);
 
     public override string ToString()
         => name;
@@ -151,7 +200,4 @@ public sealed unsafe class Matrix: IDisposable {
             ReleaseUnmanagedResources();
         }
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public float* get_pointer() => data;
 }

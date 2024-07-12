@@ -11,7 +11,7 @@ public sealed class Trainer {
         this.network = network;
     }
 
-    public void train(Dataset dataset, float learning_rate, int epochs) {
+    public void train(Dataset dataset, float learning_rate, int mini_batch_size, int epochs) {
         Stopwatch sw = new();
         sw.Start();
 
@@ -19,10 +19,12 @@ public sealed class Trainer {
         using var output = new Vector("output", network.layers[^1].output_size);
 
         for (var epoch = 0; epoch < epochs; epoch++) {
+            if (epoch % 2 == 0) dataset.shuffle(network.random);
+
             float total_error = 0;
 
             for (var i = 0; i < dataset.length; ++i) {
-                if (i % 1000 == 0)
+                if (i % 10000 == 0)
                     Console.Write($"\rEpoch {epoch + 1}, sample {i:N0} / {dataset.length:N0}, lr={learning_rate:N4}");
 
                 input.load(dataset[i].input);
@@ -30,8 +32,17 @@ public sealed class Trainer {
 
                 var predicted = network.forward(input);
 
-                network.backward(predicted, output, learning_rate);
-                total_error += output.Zip(predicted, static (target, output) => 0.5f * MathF.Pow(target - output, 2f)).Sum();
+                network.backward(predicted, output);
+
+                if (i % mini_batch_size == 0) {
+                    network.apply_gradients(learning_rate, mini_batch_size);
+                }
+
+                total_error += Vector.mean_squared_error(predicted, output);
+            }
+
+            if (dataset.length % mini_batch_size != 0) {
+                network.apply_gradients(learning_rate, mini_batch_size);
             }
 
             Console.WriteLine($"\rEpoch {epoch + 1}, loss: {total_error:N0}, duration {sw.ElapsedMilliseconds:N0} ms       ");
@@ -42,6 +53,4 @@ public sealed class Trainer {
         double total_samples = epochs * dataset.length;
         Console.WriteLine($"processed {total_samples} samples at {total_samples / sw.ElapsedMilliseconds:N2} samples/ms");
     }
-
-
 }
