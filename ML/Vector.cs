@@ -2,6 +2,7 @@ using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 
 namespace NetML.ML;
 
@@ -54,13 +55,15 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     }
 
     public static void multiply_elementwise(Vector left, Vector right, Vector result) {
-        if(left.length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        var left_length = left.length;
+
+        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
 
         var left_ptr = left.data;
         var right_ptr = right.data;
         var result_ptr = result.data;
 
-        for (var i = 0; i < left.length; i += 4) {
+        for (var i = 0; i < left_length; i += 4) {
             var l = Vector128.LoadAligned(left_ptr + i);
             var r = Vector128.LoadAligned(right_ptr + i);
             var m = l * r;
@@ -143,36 +146,42 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     }
 
     public static void subtract_elementwise(Vector left, Vector right, Vector result) {
-        if(left.length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        var left_length = left.length;
+
+        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+
+        var left_ptr = left.data;
+        var right_ptr = right.data;
+        var result_ptr = result.data;
 
         int i;
 
-        for (i = 0; i < left.length - 4; i += 4) {
-            var l = Vector128.LoadAligned(left.data + i);
-            var r = Vector128.LoadAligned(right.data + i);
+        for (i = 0; i < left_length - 4; i += 4) {
+            var l = Vector128.LoadAligned(left_ptr + i);
+            var r = Vector128.LoadAligned(right_ptr + i);
             var m = l - r;
-            m.StoreAligned(result.data + i);
+            m.StoreAligned(result_ptr + i);
         }
 
         // remaining elements if length is not a multiple of vectorSize
-        for (; i < left.length; i += 2) {
-            var l = Vector64.LoadAligned(left.data + i);
-            var r = Vector64.LoadAligned(right.data + i);
+        for (; i < left_length; i += 2) {
+            var l = Vector64.LoadAligned(left_ptr + i);
+            var r = Vector64.LoadAligned(right_ptr + i);
             var m = l - r;
-            m.StoreAligned(result.data + i);
+            m.StoreAligned(result_ptr + i);
         }
     }
 
     public static void dot(Matrix left, Vector right, Vector result) {
-        if(left.output_count != right.length) throw new Exception($"{left.name} != {right.name}");
-        if(left.input_count != result.length) throw new Exception($"{left.name} != {right.name}");
+        var right_length  = right.length;
+        var result_length = result.length;
+
+        if(left.output_count != right_length) throw new Exception($"{left.name} != {right.name}");
+        if(left.input_count != result_length) throw new Exception($"{left.name} != {right.name}");
 
         var left_ptr  = left.data;
         var right_ptr = right.data;
         var result_ptr = result.data;
-
-        var right_length = right.length;
-        var result_length = result.length;
 
         for (var i = 0; i < right_length; i++) {
             var right_value = right_ptr[i];
@@ -188,13 +197,13 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     }
 
     public static float mean_squared_error(Vector left, Vector right) {
-        if(left.length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        var left_length = left.length;
+
+        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
 
         float sum_squared_errors = 0;
 
         int i;
-
-        var left_length = left.length;
 
         for (i = 0; i < left_length - 4; i += 4) {
             var l = Vector128.LoadAligned(left.data + i);

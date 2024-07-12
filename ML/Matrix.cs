@@ -149,28 +149,28 @@ public sealed unsafe class Matrix: IDisposable {
     }
 
     public static void multiply(Matrix left, Vector right, Vector result) {
-        if (left.input_count != right.length)
+        var output_length = left.output_count;
+        var input_length  = left.input_count;
+
+        if (input_length != right.length)
             throw new Exception($"{right.name} must have length of {left.name} columns!");
-        if (left.output_count != result.length)
+        if (output_length != result.length)
             throw new Exception($"{result.name} must have length of {left.name} rows!");
 
         var left_ptr = left.data;
         var right_ptr = right.data;
         var result_ptr = result.data;
 
-        var output_length = left.output_count;
-        var input_length = left.input_count;
-
         for (var i = 0; i < output_length; i++) {
-            var sum = Vector128<float>.Zero;
+            var sum = 0f; //Vector128<float>.Zero;
 
             for (var j = 0; j < input_length; j += 4) {
                 var left_vec = Vector128.LoadAligned(left_ptr + i * input_length + j);
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
-                sum = Vector128.FusedMultiplyAdd(left_vec, right_vec, sum);
+                sum += Vector128.Dot(left_vec, right_vec); //Vector128.FusedMultiplyAdd(left_vec, right_vec, sum);
             }
 
-            result_ptr[i] = Vector128.Sum(sum);
+            result_ptr[i] = sum; //Vector128.Sum(sum);
         }
     }
 

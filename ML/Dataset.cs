@@ -189,6 +189,87 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
         return new(filename, inputs.ToList(), outputs.ToList(), labels ?? ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
     }
 
+    private float[] shift(float[] input, int width, int height, int shift_x, int shift_y) {
+        var shifted = new float[input.Length];
+        for (var y = 0; y < height; y++) {
+            for (var x = 0; x < width; x++) {
+                var new_x = x + shift_x;
+                var new_y = y + shift_y;
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                    shifted[new_x + new_y * width] = input[x + y * width];
+                }
+            }
+        }
+        return shifted;
+    }
+
+    private float[] rotate(float[] input, int width, int height, float angle) {
+        var rotated = new float[input.Length];
+        var rad     = MathF.PI * angle / 180.0f;
+        var center_x = width / 2.0f;
+        var center_y = height / 2.0f;
+
+        for (var y = 0; y < height; y++) {
+            for (var x = 0; x < width; x++) {
+                var rel_x = x - center_x;
+                var rel_y = y - center_y;
+                var new_x = (int)(rel_x * float.Cos(rad) - rel_y * float.Sin(rad) + center_x);
+                var new_y = (int)(rel_x * float.Sin(rad) + rel_y * float.Cos(rad) + center_y);
+
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                    rotated[new_x + new_y * width] = input[x + y * width];
+                }
+            }
+        }
+
+        return rotated;
+    }
+
+    private float[] scale(float[] input, int width, int height, float scale) {
+        var scaled  = new float[input.Length];
+        var center_x = width / 2.0f;
+        var center_y = height / 2.0f;
+
+        for (var y = 0; y < height; y++) {
+            for (var x = 0; x < width; x++) {
+                var rel_x = (x - center_x) / scale + center_x;
+                var rel_y = (y - center_y) / scale + center_y;
+                var new_x = (int)float.Round(rel_x);
+                var new_y = (int)float.Round(rel_y);
+
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                    scaled[x + y * width] = input[new_x + new_y * width];
+                }
+            }
+        }
+
+        return scaled;
+    }
+
+    private float[] adjust_brightness(float[] input, float factor) {
+        var adjusted = new float[input.Length];
+        for (var i = 0; i < input.Length; i++) {
+            adjusted[i] = float.Clamp(input[i] * factor, 0f, 1f);
+        }
+        return adjusted;
+    }
+
+    private float[] add_gaussian_noise(float[] input, float mean, float stddev, Random rand) {
+        var noisy = new float[input.Length];
+        for (var i = 0; i < input.Length; i++) {
+            noisy[i] = input[i] + (float)next_gaussian(rand, mean, stddev);
+        }
+        return noisy;
+    }
+
+    private float[] add_noise(float[] input, float noise_level, Random rand) {
+        var noisy = new float[input.Length];
+        for (var i = 0; i < input.Length; i++) {
+            noisy[i] = float.Clamp(input[i] + (rand.NextSingle() * 2f - 1f) * noise_level, 0f, 1f);
+        }
+        return noisy;
+    }
+
     public readonly ref struct Sample {
         public ReadOnlySpan<float> input { get;}
         public ReadOnlySpan<float> output { get; }
@@ -222,4 +303,12 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
 
     IEnumerator IEnumerable.GetEnumerator()
         => GetEnumerator();
+
+    public static double next_gaussian(Random rand, float mean = 0f, float stdev = 1f) {
+        // Using Box-Muller transform
+        var u1            = 1.0f - rand.NextSingle(); // uniform(0,1] random doubles
+        var u2            = 1.0f - rand.NextSingle();
+        var rand_std_normal = float.Sqrt(-2.0f * float.Log(u1)) * float.Sin(2.0f * MathF.PI * u2); // random normal(0,1)
+        return mean + stdev * rand_std_normal; // random normal(mean,stdDev^2)
+    }
 }
