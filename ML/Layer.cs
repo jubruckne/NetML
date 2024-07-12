@@ -8,8 +8,10 @@ public sealed class Layer: IDisposable {
     public Matrix weights { get; }
     public Vector biases { get; }
 
-    private readonly Matrix inputs;
-    private readonly Matrix outputs;
+    private readonly Vector inputs;
+    private readonly Vector outputs;
+    //private readonly Matrix inputs;
+    //private readonly Matrix outputs;
 
     private readonly Vector output_errors;
     private readonly Vector output_derivatives;
@@ -29,8 +31,10 @@ public sealed class Layer: IDisposable {
         this.weights = new Matrix("weighs", output_size, input_size);
         this.biases = new Vector("biases", output_size);
 
-        this.inputs = new Matrix("inputs", batch_size, input_size);
-        this.outputs = new Matrix("outputs", batch_size, output_size);
+        this.inputs  = new Vector("inputs", input_size);
+        this.outputs = new Vector("outputs", output_size);
+        //this.inputs  = new Matrix("inputs", batch_size, input_size);
+        //this.outputs = new Matrix("outputs", batch_size, output_size);
 
         this.output_derivatives = new Vector("derivatives", output_size);
         this.output_errors = new Vector("errors", output_size);
@@ -56,7 +60,7 @@ public sealed class Layer: IDisposable {
         }
     }
 
-    public Vector forward(Matrix inputs) {
+    public Vector forward(Vector inputs) {
         this.inputs.load(inputs.as_span());
 
         // Console.WriteLine($"\n{name}_forward");

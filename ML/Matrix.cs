@@ -76,6 +76,17 @@ public sealed unsafe class Matrix: IDisposable {
         }
     }
 
+    public void add_elementwise(Vector other) {
+        if (output_count != other.length) throw new Exception($"output_count != other.output_count");
+
+        for (var i = 0; i < linear_length; i += 4) {
+            var v = Vector128.LoadAligned(data + i);
+            var o = Vector128.LoadAligned(other.data + i);
+            var m = v + o;
+            m.StoreAligned(data + i);
+        }
+    }
+
     public void add_elementwise(Matrix other) {
         if (input_count != other.input_count) throw new Exception($"input_count != other.input_count");
         if (output_count != other.output_count) throw new Exception($"output_count != other.output_count");
@@ -108,6 +119,35 @@ public sealed unsafe class Matrix: IDisposable {
         }
     }
 
+    public static void multiply(Matrix left, Matrix right, Matrix result) {
+        if (left.input_count != right.output_count)
+            throw new Exception($"{right.name} must have number of rows equal to the number of columns of {left.name}!");
+        if (left.output_count != result.output_count || right.input_count != result.input_count)
+            throw new Exception($"{result.name} must have the same dimensions as the product of {left.name} and {right.name}!");
+
+        var left_ptr   = left.data;
+        var right_ptr  = right.data;
+        var result_ptr = result.data;
+
+        var rows       = left.output_count;
+        var cols       = right.input_count;
+        var common_dim = left.input_count;
+
+        for (var i = 0; i < rows; i++) {
+            for (var j = 0; j < cols; j++) {
+                var sum = Vector128<float>.Zero;
+
+                for (var k = 0; k < common_dim; k += 4) {
+                    var left_vec  = Vector128.LoadAligned(left_ptr + i * common_dim + k);
+                    var right_vec = Vector128.LoadAligned(right_ptr + k * cols + j);
+                    sum = Vector128.FusedMultiplyAdd(left_vec, right_vec, sum);
+                }
+
+                result_ptr[i * cols + j] = Vector128.Sum(sum);
+            }
+        }
+    }
+
     public static void multiply(Matrix left, Vector right, Vector result) {
         if (left.input_count != right.length)
             throw new Exception($"{right.name} must have length of {left.name} columns!");
@@ -127,7 +167,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < input_length; j += 4) {
                 var left_vec = Vector128.LoadAligned(left_ptr + i * input_length + j);
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
-                sum = Vector128.FusedMultiplyAdd(sum, left_vec, right_vec);
+                sum = Vector128.FusedMultiplyAdd(left_vec, right_vec, sum);
             }
 
             result_ptr[i] = Vector128.Sum(sum);
@@ -148,7 +188,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < right_length; j += 4) {
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
                 var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
-                var p         = Vector128.FusedMultiplyAdd(v, right_vec, left_value);
+                var p         = Vector128.FusedMultiplyAdd(right_vec, left_value, v);
                 p.StoreAligned(data_ptr + i * right_length + j);
             }
         }
@@ -168,7 +208,7 @@ public sealed unsafe class Matrix: IDisposable {
             for (var j = 0; j < right_length; j += 4) {
                 var right_vec = Vector128.LoadAligned(right_ptr + j);
                 var v         = Vector128.LoadAligned(data_ptr + i * right_length + j);
-                var p         = Vector128.FusedMultiplyAdd(v, right_vec, left_value);
+                var p         = Vector128.FusedMultiplyAdd(right_vec, left_value, v);
                 p.StoreAligned(data_ptr + i * right_length + j);
             }
         }

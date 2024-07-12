@@ -39,7 +39,7 @@ public static class ActivationFunctions {
         var length = source.length;
 
         int i;
-        for (i = 0; i <= length - 4; i += 4) {
+        for (i = 0; i < length - 4; i += 4) {
             var v = Vector128.LoadAligned(src_ptr + i);
 
             v = Vector128<float>.One
