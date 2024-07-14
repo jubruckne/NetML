@@ -11,8 +11,7 @@ Console.WriteLine();
 //var ds = Dataset.load(DatasetType.Cifar10_Train);
 //ds.shuffle(Random.Shared);
 var ds = Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv");
-var mlp = new Network([ds.input_length, 64, 64, 64, ds.output_length], 16);
-ds.shuffle(mlp.random);
+var mlp = new Network([ds.input_length, 128, ds.output_length], 16);
 
 var trainer = new Trainer(mlp);
 // Correct: 9228 / 10000 (92,3 %)
@@ -23,7 +22,7 @@ var trainer = new Trainer(mlp);
 
 Console.WriteLine();
 Console.WriteLine("Training...");
-trainer.train(ds, 0.0047f, 64, 50);
+trainer.train(ds, 0.0047f, 8, 99);
 
 Console.WriteLine();
 Console.WriteLine("Training finished.");
@@ -31,7 +30,7 @@ Console.WriteLine();
 Console.WriteLine("Evaluating.");
 
 ds = Dataset.load_from_url("https://pjreddie.com/media/files/mnist_test.csv");
-
+//ds = Dataset.load(DatasetType.Cifar10_Test);
 var correct = 0;
 
 foreach (var sample in ds) {

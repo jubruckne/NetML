@@ -296,9 +296,12 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
         }
 
         public override string ToString() {
-            var s = "";
-            for (var y = 0; y < 28; ++y) {
-                for (var x = 0; x < 28; ++x) s += $"{format(input[x + y * 28])}";
+            var width = (int)float.Sqrt(input.length);
+            var height = (int)float.Sqrt(input.length);
+
+            var s = "\n";
+            for (var y = 0; y < height; ++y) {
+                for (var x = 0; x < width; ++x) s += $"{format(input[x + y * height])}";
 
                 s += "\n";
             }

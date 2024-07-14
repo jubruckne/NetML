@@ -31,7 +31,7 @@ public sealed class Layer: IDisposable {
         this.weights = new Matrix("weighs", output_size, input_size);
         this.biases = new Vector("biases", output_size);
 
-        Console.WriteLine($"Creating layer {name}... input_size: {input_size}, output_size: {output_size}");
+        Console.WriteLine($"Layer {name}... input_size: {input_size}, output_size: {output_size}");
 
         this.input  = new Vector("inputs", input_size);
         this.output = new Vector("outputs", output_size);
