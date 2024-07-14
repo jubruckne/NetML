@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Intrinsics;
+using System.Xml;
 using NetML;
 using NetML.ML;
 
@@ -9,13 +10,39 @@ Console.WriteLine();
 
 //var ds = Dataset.load(DatasetType.Cifar10_Train);
 //ds.shuffle(Random.Shared);
-var ds =
-   Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv")
-   + Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv")
-   + Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv")
-   + Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv");
+var ds = Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv");
+var mlp = new Network([ds.input_length, 64, 64, 64, ds.output_length], 16);
+ds.shuffle(mlp.random);
 
-var mlp = new Network([ds.input_length, 128, ds.output_length], 16);
 var trainer = new Trainer(mlp);
+// Correct: 9228 / 10000 (92,3 %)
+// Correct: 9230 / 10000 (92,3 %)
+// Correct: 9214 / 10000 (92,1 %)
+// Correct: 9238 / 10000 (92,4 %)
+//
 
-trainer.train(ds, 0.00751f, 16, 9);
+Console.WriteLine();
+Console.WriteLine("Training...");
+trainer.train(ds, 0.0047f, 64, 50);
+
+Console.WriteLine();
+Console.WriteLine("Training finished.");
+Console.WriteLine();
+Console.WriteLine("Evaluating.");
+
+ds = Dataset.load_from_url("https://pjreddie.com/media/files/mnist_test.csv");
+
+var correct = 0;
+
+foreach (var sample in ds) {
+   var prediction = mlp.forward(sample.input).index_of_max_value();
+   if (prediction == sample.label) {
+      correct++;
+   } else {
+      Console.WriteLine($"Predicted: {prediction}, Actual: {sample}");
+      Console.WriteLine();
+   }
+}
+
+Console.WriteLine();
+Console.WriteLine($"Correct: {correct} / {ds.length} ({correct / (double)ds.length:P1})");

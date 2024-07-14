@@ -15,11 +15,8 @@ public sealed class Trainer {
         Stopwatch sw = new();
         sw.Start();
 
-        using var input = new Vector("input", network.layers[0].input_size);
-        using var output = new Vector("output", network.layers[^1].output_size);
-
         for (var epoch = 0; epoch < epochs; epoch++) {
-            if (epoch % 2 == 0) dataset.shuffle(network.random);
+            //if (epoch % 2 == 0) dataset.shuffle(network.random);
 
             float total_error = 0;
 
@@ -27,8 +24,8 @@ public sealed class Trainer {
                 if (i % 10000 == 0)
                     Console.Write($"\rEpoch {epoch + 1}, sample {i:N0} / {dataset.length:N0}, lr={learning_rate:N4}");
 
-                input.load(dataset[i].input);
-                output.load(dataset[i].output);
+                var input = dataset[i].input;
+                var output = dataset[i].output;
 
                 var predicted = network.forward(input);
 

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
+using NetML.ML;
 
 namespace NetML;
 
@@ -15,39 +16,47 @@ public enum DatasetType {
     Cifar10_Train
 }
 
-public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name)> {
+public sealed class Dataset: IEnumerable<Dataset.Sample> {
     public string[] labels { get; }
     public string name { get; }
-    public int length => inputs.Count;
+    public int length => m_inputs.output_count;
 
-    public int input_length => inputs[0].Length;
-    public int output_length => outputs[0].Length;
+    public int input_length => m_inputs.input_count;
+    public int output_length => m_outputs.input_count;
 
-    private readonly List<float[]> inputs;
-    private readonly List<float[]> outputs;
+    private readonly Matrix m_inputs;
+    private readonly Matrix m_outputs;
+
     private int[] indices;
 
     private const string cache_dir = "../../../.cache/";
 
     private Dataset(string name, List<float[]> inputs, List<float[]> outputs, string[] labels) {
         this.name    = name;
-        this.inputs = inputs;
-        this.outputs = outputs;
         this.labels  = labels;
-        this.indices = Enumerable.Range(0, inputs.Count).ToArray();
+
+        m_inputs = new Matrix("inputs", inputs.Count, inputs[0].Length);
+        m_outputs = new Matrix("outputs", outputs.Count, outputs[0].Length);
+
+        for (var i = 0; i < inputs.Count; i++) {
+            m_inputs.insert(i, inputs[i]);
+        }
+
+        for (var i = 0; i < outputs.Count; i++) {
+            m_outputs.insert(i, outputs[i]);
+        }
+
+        indices = Enumerable.Range(0, inputs.Count).ToArray();
     }
 
     public Sample this[int sample] {
         get {
             var idx = indices[sample];
 
-            for (var i = 0; i < outputs.Count; ++i) {
-                if (outputs[idx][i] != 0f) {
-                    return new(inputs[idx], outputs[idx], i);
-                }
-            }
+            var input = m_inputs.view(0, idx);
+            var output = m_outputs.view(0, idx);
 
-            throw new KeyNotFoundException(sample.ToString());
+            return new(input, output);
         }
     }
 
@@ -70,11 +79,12 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
     }
 
     public (Dataset d1, Dataset d2) split(float p) {
-        var sample_count = inputs.Count;
+        var sample_count = m_inputs.output_count;
         var p1_count     = (int)(sample_count * p);
         var p2_count     = sample_count - p1_count;
 
-        return (new(
+        throw new NotImplementedException();
+        /*return (new(
                     name + "_1",
                     inputs.Take(p1_count).ToList(),
                     outputs.Take(p1_count).ToList(),
@@ -87,6 +97,7 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
                     labels
                    )
             );
+            */
     }
 
     public void shuffle(Random rand)
@@ -96,12 +107,14 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
         => indices = indices.Reverse().ToArray();
 
     public static Dataset operator+(Dataset left, Dataset right) {
-        return new Dataset(
+        throw new NotImplementedException();
+       /* return new Dataset(
                                      left.name + "+" + right.name,
                                      left.inputs.Concat(right.inputs).ToList(),
                                      left.outputs.Concat(right.outputs).ToList(),
                                      left.labels
                                     );
+                                    */
     }
 
     private static string read_url(string url) {
@@ -270,16 +283,16 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
         return noisy;
     }
 
-    public readonly ref struct Sample {
-        public ReadOnlySpan<float> input { get;}
-        public ReadOnlySpan<float> output { get; }
+    public readonly struct Sample {
+        public Vector input { get;}
+        public Vector output { get; }
         public int label { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Sample(Span<float> input, Span<float> output, int label) {
+        public Sample(Vector input, Vector output) {
             this.input = input;
             this.output = output;
-            this.label = label;
+            this.label = output.index_of_max_value();
         }
 
         public override string ToString() {
@@ -294,10 +307,9 @@ public sealed class Dataset: IEnumerable<(float[] inputs, int label, string name
         }
     }
 
-    public IEnumerator<(float[] inputs, int label, string name)> GetEnumerator() {
+    public IEnumerator<Sample> GetEnumerator() {
         for (var i = 0; i < length; ++i) {
-            var sample = this[i];
-            yield return (sample.input.ToArray(), sample.label, labels[sample.label]);
+            yield return this[i];
         }
     }
 

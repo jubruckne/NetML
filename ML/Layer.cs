@@ -8,8 +8,8 @@ public sealed class Layer: IDisposable {
     public Matrix weights { get; }
     public Vector biases { get; }
 
-    private readonly Vector inputs;
-    private readonly Vector outputs;
+    private readonly Vector input;
+    private readonly Vector output;
     //private readonly Matrix inputs;
     //private readonly Matrix outputs;
 
@@ -31,8 +31,10 @@ public sealed class Layer: IDisposable {
         this.weights = new Matrix("weighs", output_size, input_size);
         this.biases = new Vector("biases", output_size);
 
-        this.inputs  = new Vector("inputs", input_size);
-        this.outputs = new Vector("outputs", output_size);
+        Console.WriteLine($"Creating layer {name}... input_size: {input_size}, output_size: {output_size}");
+
+        this.input  = new Vector("inputs", input_size);
+        this.output = new Vector("outputs", output_size);
         //this.inputs  = new Matrix("inputs", batch_size, input_size);
         //this.outputs = new Matrix("outputs", batch_size, output_size);
 
@@ -60,34 +62,30 @@ public sealed class Layer: IDisposable {
         }
     }
 
-    public Vector forward(Vector inputs) {
-        this.inputs.load(inputs.as_span());
+    public Vector forward(Vector input) {
+        this.input.load(input.as_span());
 
-        // Console.WriteLine($"\n{name}_forward");
+        Matrix.multiply(weights, input, output);
 
-        Matrix.multiply(weights, inputs, outputs);
+        output.add_elementwise(biases);
 
-        outputs.add_elementwise(biases);
+        ActivationFunctions.sigmoid(output);
 
-        ActivationFunctions.sigmoid(outputs);
-
-        return outputs;
+        return output;
     }
 
     public Vector backward(Vector output_gradients) {
         // Console.WriteLine($"\n{name}_backward");
 
         // Calculate the derivative of the outputs
-        ActivationFunctions.sigmoid_derivative(outputs, output_derivatives);
+        ActivationFunctions.sigmoid_derivative(output, output_derivatives);
 
         // Calculate the errors for each output node
         Vector.multiply_elementwise(output_gradients, output_derivatives, output_errors);
+
         Vector.dot(weights, output_gradients, input_gradients);
 
-        //weights.add_outer_product_weighted(output_errors, inputs, 0.009f);
-        //biases.add_elementwise_weighted(output_errors, 0.009f);
-
-        weight_gradients.add_outer_product(output_errors, inputs);
+        weight_gradients.add_outer_product(output_errors, input);
         bias_gradients.add_elementwise(output_errors);
 
         return input_gradients;
@@ -104,11 +102,11 @@ public sealed class Layer: IDisposable {
     public void Dispose() {
         weights.Dispose();
         biases.Dispose();
-        outputs.Dispose();
+        output.Dispose();
         output_derivatives.Dispose();
         output_errors.Dispose();
         input_gradients.Dispose();
-        inputs.Dispose();
+        input.Dispose();
         weight_gradients.Dispose();
         bias_gradients.Dispose();
     }

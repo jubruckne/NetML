@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
+using System.Text;
 
 namespace NetML.ML;
 
@@ -15,21 +16,21 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     private int allocated;
 
     public Vector(string name, int length, float* data) {
+        if(length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
+
         this.name = name;
         this.length = length;
-        this.data = data;
-        allocated = 0;
+        this.data   = data;
+        this.allocated = 0;
     }
 
     public Vector(string name, int length) {
         if(length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
 
-        this.name   = $"{name}[len={length}]";
+        this.name   = name;
         this.length = length;
         this.data   = (float*)NativeMemory.AlignedAlloc((UIntPtr)(length * sizeof(float)), 16);
         this.allocated = 1;
-
-        // Console.WriteLine($"allocating vector {name}");
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -64,10 +65,10 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         var result_ptr = result.data;
 
         for (var i = 0; i < left_length; i += 4) {
-            var l = Vector128.LoadAligned(left_ptr + i);
-            var r = Vector128.LoadAligned(right_ptr + i);
+            var l = Vector128.Load(left_ptr + i);
+            var r = Vector128.Load(right_ptr + i);
             var m = l * r;
-            m.StoreAligned(result_ptr + i);
+            m.Store(result_ptr + i);
         }
     }
 
@@ -83,18 +84,18 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         int i;
 
         for (i = 0; i < length - 4; i += 4) {
-            var v = Vector128.LoadAligned(data_ptr + i);
-            var o = Vector128.LoadAligned(other_ptr + i);
+            var v = Vector128.Load(data_ptr + i);
+            var o = Vector128.Load(other_ptr + i);
             var m = v + o;
-            m.StoreAligned(data_ptr + i);
+            m.Store(data_ptr + i);
         }
 
         // remaining elements if length is not a multiple of vectorSize
         for (; i < length; i += 2) {
-            var v = Vector64.LoadAligned(data_ptr + i);
-            var o = Vector64.LoadAligned(other_ptr + i);
+            var v = Vector64.Load(data_ptr + i);
+            var o = Vector64.Load(other_ptr + i);
             var m = v + o;
-            m.StoreAligned(data_ptr + i);
+            m.Store(data_ptr + i);
         }
     }
 
@@ -109,18 +110,19 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         int i;
 
         for (i = 0; i < length - 4; i += 4) {
-            var v = Vector128.LoadAligned(data_ptr + i);
-            var o = Vector128.LoadAligned(other_ptr + i);
+            AdvSimd.LoadVector128(data);
+            var v = Vector128.Load(data_ptr + i);
+            var o = Vector128.Load(other_ptr + i);
             var m = v + o * weight;
-            m.StoreAligned(data_ptr + i);
+            m.Store(data_ptr + i);
         }
 
         // remaining elements if length is not a multiple of vectorSize
         for (; i < length; i += 2) {
-            var v = Vector64.LoadAligned(data_ptr + i);
-            var o = Vector64.LoadAligned(other_ptr + i);
+            var v = Vector64.Load(data_ptr + i);
+            var o = Vector64.Load(other_ptr + i);
             var m = v + o * weight;
-            m.StoreAligned(data_ptr + i);
+            m.Store(data_ptr + i);
         }
     }
 
@@ -130,18 +132,18 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         int i;
 
         for (i = 0; i < left.length - 4; i += 4) {
-            var l = Vector128.LoadAligned(left.data + i);
-            var r = Vector128.LoadAligned(right.data + i);
+            var l = Vector128.Load(left.data + i);
+            var r = Vector128.Load(right.data + i);
             var m = l + r;
-            m.StoreAligned(result.data + i);
+            m.Store(result.data + i);
         }
 
         // remaining elements if length is not a multiple of vectorSize
         for (; i < left.length; i += 2) {
-            var l = Vector64.LoadAligned(left.data + i);
-            var r = Vector64.LoadAligned(right.data + i);
+            var l = Vector64.Load(left.data + i);
+            var r = Vector64.Load(right.data + i);
             var m = l + r;
-            m.StoreAligned(result.data + i);
+            m.Store(result.data + i);
         }
     }
 
@@ -149,6 +151,7 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         var left_length = left.length;
 
         if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        if(left_length != result.length) throw new Exception($"vectors must be same size: {left.name} != {result.name}");
 
         var left_ptr = left.data;
         var right_ptr = right.data;
@@ -157,18 +160,18 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         int i;
 
         for (i = 0; i < left_length - 4; i += 4) {
-            var l = Vector128.LoadAligned(left_ptr + i);
-            var r = Vector128.LoadAligned(right_ptr + i);
+            var l = Vector128.Load(left_ptr + i);
+            var r = Vector128.Load(right_ptr + i);
             var m = l - r;
-            m.StoreAligned(result_ptr + i);
+            m.Store(result_ptr + i);
         }
 
         // remaining elements if length is not a multiple of vectorSize
         for (; i < left_length; i += 2) {
-            var l = Vector64.LoadAligned(left_ptr + i);
-            var r = Vector64.LoadAligned(right_ptr + i);
+            var l = Vector64.Load(left_ptr + i);
+            var r = Vector64.Load(right_ptr + i);
             var m = l - r;
-            m.StoreAligned(result_ptr + i);
+            m.Store(result_ptr + i);
         }
     }
 
@@ -196,6 +199,27 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         }
     }
 
+    public float sum() {
+        var length = this.length;
+        var data_ptr = this.data;
+
+        int i;
+        var sum = 0f;
+
+        for (i = 0; i < length - 4; i += 4) {
+            var v = Vector128.Load(data_ptr + i);
+            sum += Vector128.Sum(v);
+        }
+
+        // remaining elements if length is not a multiple of vectorSize
+        for (; i < length; i += 2) {
+            var v = Vector64.Load(data_ptr + i);
+            sum += Vector64.Sum(v);
+        }
+
+        return sum;
+    }
+
     public static float mean_squared_error(Vector left, Vector right) {
         var left_length = left.length;
 
@@ -206,41 +230,88 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         int i;
 
         for (i = 0; i < left_length - 4; i += 4) {
-            var l = Vector128.LoadAligned(left.data + i);
-            var r = Vector128.LoadAligned(right.data + i);
+            var l = Vector128.Load(left.data + i);
+            var r = Vector128.Load(right.data + i);
             var e = l - r;
-            sum_squared_errors += Vector128.Sum(e);
+            sum_squared_errors += Vector128.Sum(e * e);
         }
 
         // remaining elements if length is not a multiple of vectorSize
         for (; i < left_length; i += 2) {
-            var l = Vector64.LoadAligned(left.data + i);
-            var r = Vector64.LoadAligned(right.data + i);
+            var l = Vector64.Load(left.data + i);
+            var r = Vector64.Load(right.data + i);
             var e = l - r;
-            sum_squared_errors += Vector64.Sum(e);
+            sum_squared_errors += Vector64.Sum(e * e);
         }
 
         return sum_squared_errors / left_length;
     }
 
+    public int index_of(float value) {
+        var length = this.length;
+
+        var search_value = Vector128.Create(value);
+
+        for (var i = 0; i <= length - 4; i += 4) {
+            var v = Vector128.Load(data + i);
+
+            var comp = Vector128.Equals(v, search_value);
+            if (comp.Equals(Vector128<float>.Zero)) continue;
+
+            // If there is a match, find the exact index
+            for (var j = 0; j < Vector128<float>.Count; j++) {
+                // ReSharper disable once CompareOfFloatsByEqualityOperator
+                if (v.GetElement(j) == value) {
+                    return i + j;
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    public int index_of_max_value() {
+        if (length == 0) return -1;
+
+        var max_index = 0;
+        var max_value = this[0];
+
+        for (var i = 1; i < length; ++i) {
+            if (this[i] > max_value) {
+                max_value = this[i];
+                max_index = i;
+            }
+        }
+
+        return max_index;
+    }
+
+    /*
+    public static implicit operator Vector(float[] data) => new Vector("temp", data);
+    public static implicit operator Vector(Span<float> data) => new Vector("temp", data.ToArray());
+    public static implicit operator Vector(ReadOnlySpan<float> data) => new Vector("temp", data.ToArray());
+*/
     public override string ToString()
-        => $"{name} [{string.Join(", ", this.Select(static f => f))}]";
+        => $"{name}[len={length}]";
+
+    public string print() {
+        StringBuilder sb = new();
+
+        sb.AppendLine(ToString());
+        sb.Append("  ");
+        for (var i = 0; i < length; ++i) {
+            sb.Append($"{this[i]:N4}, ");
+            if(i % 16 == 0) sb.Append("\n  ");
+        }
+
+        return sb.ToString().TrimEnd(',', ' ');
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<float> as_span() => new Span<float>(data, length);
 
-    private void ReleaseUnmanagedResources() {
-        if (Interlocked.CompareExchange(ref allocated, 0, 1) != 1) return;
-        Console.WriteLine($"releasing vector {name}");
-        NativeMemory.AlignedFree(data);
-    }
-
-    public void Dispose() {
-        if (allocated == 1) {
-            ReleaseUnmanagedResources();
-        }
-        GC.SuppressFinalize(this);
-    }
+    public bool is_aligned()
+        => (nuint)data % 16 == 0;
 
     public IEnumerator<float> GetEnumerator() {
         for (var i = 0; i < length; ++i) {
@@ -250,9 +321,23 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    ~Vector() {
-        if (allocated == 1) {
-            ReleaseUnmanagedResources();
+    private void ReleaseUnmanagedResources() {
+        var alloc = Interlocked.CompareExchange(ref allocated, 0, 1);
+
+        if (alloc == 1) {
+            Console.WriteLine($"releasing vector {name}");
+            NativeMemory.AlignedFree(data);
         }
+    }
+
+    public void Dispose() {
+        if (allocated == 0) return;
+        ReleaseUnmanagedResources();
+        GC.SuppressFinalize(this);
+    }
+
+    ~Vector() {
+        if (allocated == 0) return;
+        ReleaseUnmanagedResources();
     }
 }

@@ -23,8 +23,8 @@ public sealed class Network: IDisposable {
         gradient = new Vector("expected", layers[^1].output_size);
     }
 
-    public Vector forward(Vector inputs) {
-        var x = inputs;
+    public Vector forward(Vector input) {
+        var x = input;
         foreach (var layer in layers) {
             x = layer.forward(x);
         }
