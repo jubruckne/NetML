@@ -32,19 +32,15 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     private const string cache_dir = "../../../.cache/";
 
     private Dataset(string name, List<float[]> inputs, List<float[]> outputs, string[] labels) {
-        this.name    = name;
-        this.labels  = labels;
+        this.name   = name;
+        this.labels = labels;
 
-        m_inputs = new Matrix("inputs", inputs.Count, inputs[0].Length);
-        m_outputs = new Matrix("outputs", outputs.Count, outputs[0].Length);
+        m_inputs  = new("inputs", inputs.Count, inputs[0].Length);
+        m_outputs = new("outputs", outputs.Count, outputs[0].Length);
 
-        for (var i = 0; i < inputs.Count; i++) {
-            m_inputs.insert(i, inputs[i]);
-        }
+        for (var i = 0; i < inputs.Count; i++) m_inputs.insert(i, inputs[i]);
 
-        for (var i = 0; i < outputs.Count; i++) {
-            m_outputs.insert(i, outputs[i]);
-        }
+        for (var i = 0; i < outputs.Count; i++) m_outputs.insert(i, outputs[i]);
 
         indices = Enumerable.Range(0, inputs.Count).ToArray();
     }
@@ -53,7 +49,7 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
         get {
             var idx = indices[sample];
 
-            var input = m_inputs.view(0, idx);
+            var input  = m_inputs.view(0, idx);
             var output = m_outputs.view(0, idx);
 
             return new(input, output);
@@ -100,25 +96,27 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
             */
     }
 
-    public void shuffle(Random rand)
-        => rand.Shuffle(indices);
+    public void shuffle(Random rand) {
+        rand.Shuffle(indices);
+    }
 
-    public void reverse()
-        => indices = indices.Reverse().ToArray();
+    public void reverse() {
+        indices = indices.Reverse().ToArray();
+    }
 
     public static Dataset operator+(Dataset left, Dataset right) {
         throw new NotImplementedException();
-       /* return new Dataset(
-                                     left.name + "+" + right.name,
-                                     left.inputs.Concat(right.inputs).ToList(),
-                                     left.outputs.Concat(right.outputs).ToList(),
-                                     left.labels
-                                    );
-                                    */
+        /* return new Dataset(
+                                      left.name + "+" + right.name,
+                                      left.inputs.Concat(right.inputs).ToList(),
+                                      left.outputs.Concat(right.outputs).ToList(),
+                                      left.labels
+                                     );
+                                     */
     }
 
     private static string read_url(string url) {
-        using HttpClient client = new HttpClient();
+        using var client = new HttpClient();
 
         var response = client.GetAsync(url).GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
@@ -126,9 +124,7 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     }
 
     public static Dataset load_from_url(string url) {
-        if (!Directory.Exists(cache_dir)) {
-            Directory.CreateDirectory(cache_dir);
-        }
+        if (!Directory.Exists(cache_dir)) Directory.CreateDirectory(cache_dir);
 
         var filename = $"{cache_dir}/{new Uri(url).Segments[^1]}";
 
@@ -141,7 +137,7 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     }
 
     public static Dataset load(DatasetType type) {
-        if (type == DatasetType.Cifar10_Test) {
+        if (type == DatasetType.Cifar10_Test)
             return load_from_file(
                                   "cifar10_test.csv",
                                   1f,
@@ -158,9 +154,8 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
                                       "Truck"
                                   ]
                                  );
-        }
 
-        if (type == DatasetType.Cifar10_Train) {
+        if (type == DatasetType.Cifar10_Train)
             return load_from_file(
                                   "cifar10_train.csv",
                                   1f,
@@ -177,17 +172,14 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
                                       "Truck"
                                   ]
                                  );
-        }
 
         throw new ArgumentException("Invalid dataset type");
     }
 
     public static Dataset load_from_file(string filename, float sample_percent = 1f, string[]? labels = null) {
-        if (!File.Exists(filename)) {
-            filename = $"{cache_dir}/{filename}";
-        }
+        if (!File.Exists(filename)) filename = $"{cache_dir}/{filename}";
 
-        var lines = File.ReadAllLines(filename);
+        var lines        = File.ReadAllLines(filename);
         var sample_count = (int)(lines.Length * sample_percent);
         var inputs       = new float[sample_count][];
         var outputs      = new float[sample_count][];
@@ -199,7 +191,12 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
             outputs[i][(int)values[0]] = 1.0f; // One-hot encode the label
         }
 
-        return new(filename, inputs.ToList(), outputs.ToList(), labels ?? ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+        return new(
+                   filename,
+                   inputs.ToList(),
+                   outputs.ToList(),
+                   labels ?? ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+                  );
     }
 
     private float[] shift(float[] input, int width, int height, int shift_x, int shift_y) {
@@ -208,17 +205,17 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
             for (var x = 0; x < width; x++) {
                 var new_x = x + shift_x;
                 var new_y = y + shift_y;
-                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height)
                     shifted[new_x + new_y * width] = input[x + y * width];
-                }
             }
         }
+
         return shifted;
     }
 
     private float[] rotate(float[] input, int width, int height, float angle) {
-        var rotated = new float[input.Length];
-        var rad     = MathF.PI * angle / 180.0f;
+        var rotated  = new float[input.Length];
+        var rad      = MathF.PI * angle / 180.0f;
         var center_x = width / 2.0f;
         var center_y = height / 2.0f;
 
@@ -229,9 +226,8 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
                 var new_x = (int)(rel_x * float.Cos(rad) - rel_y * float.Sin(rad) + center_x);
                 var new_y = (int)(rel_x * float.Sin(rad) + rel_y * float.Cos(rad) + center_y);
 
-                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height)
                     rotated[new_x + new_y * width] = input[x + y * width];
-                }
             }
         }
 
@@ -239,7 +235,7 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     }
 
     private float[] scale(float[] input, int width, int height, float scale) {
-        var scaled  = new float[input.Length];
+        var scaled   = new float[input.Length];
         var center_x = width / 2.0f;
         var center_y = height / 2.0f;
 
@@ -250,9 +246,8 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
                 var new_x = (int)float.Round(rel_x);
                 var new_y = (int)float.Round(rel_y);
 
-                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height) {
+                if (new_x >= 0 && new_x < width && new_y >= 0 && new_y < height)
                     scaled[x + y * width] = input[new_x + new_y * width];
-                }
             }
         }
 
@@ -260,43 +255,38 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     }
 
     private float[] adjust_brightness(float[] input, float factor) {
-        var adjusted = new float[input.Length];
-        for (var i = 0; i < input.Length; i++) {
-            adjusted[i] = float.Clamp(input[i] * factor, 0f, 1f);
-        }
+        var adjusted                                       = new float[input.Length];
+        for (var i = 0; i < input.Length; i++) adjusted[i] = float.Clamp(input[i] * factor, 0f, 1f);
         return adjusted;
     }
 
     private float[] add_gaussian_noise(float[] input, float mean, float stddev, Random rand) {
-        var noisy = new float[input.Length];
-        for (var i = 0; i < input.Length; i++) {
-            noisy[i] = input[i] + (float)next_gaussian(rand, mean, stddev);
-        }
+        var noisy                                       = new float[input.Length];
+        for (var i = 0; i < input.Length; i++) noisy[i] = input[i] + (float)next_gaussian(rand, mean, stddev);
         return noisy;
     }
 
     private float[] add_noise(float[] input, float noise_level, Random rand) {
         var noisy = new float[input.Length];
-        for (var i = 0; i < input.Length; i++) {
+        for (var i = 0; i < input.Length; i++)
             noisy[i] = float.Clamp(input[i] + (rand.NextSingle() * 2f - 1f) * noise_level, 0f, 1f);
-        }
         return noisy;
     }
 
     public readonly struct Sample {
-        public Vector input { get;}
+        public Vector input { get; }
         public Vector output { get; }
         public int label { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Sample(Vector input, Vector output) {
-            this.input = input;
+            this.input  = input;
             this.output = output;
-            this.label = output.index_of_max_value();
+            label       = output.index_of_max_value();
         }
 
         public override string ToString() {
-            var width = (int)float.Sqrt(input.length);
+            var width  = (int)float.Sqrt(input.length);
             var height = (int)float.Sqrt(input.length);
 
             var s = "\n";
@@ -311,18 +301,17 @@ public sealed class Dataset: IEnumerable<Dataset.Sample> {
     }
 
     public IEnumerator<Sample> GetEnumerator() {
-        for (var i = 0; i < length; ++i) {
-            yield return this[i];
-        }
+        for (var i = 0; i < length; ++i) yield return this[i];
     }
 
-    IEnumerator IEnumerable.GetEnumerator()
-        => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() {
+        return GetEnumerator();
+    }
 
     public static double next_gaussian(Random rand, float mean = 0f, float stdev = 1f) {
         // Using Box-Muller transform
-        var u1            = 1.0f - rand.NextSingle(); // uniform(0,1] random doubles
-        var u2            = 1.0f - rand.NextSingle();
+        var u1              = 1.0f - rand.NextSingle(); // uniform(0,1] random doubles
+        var u2              = 1.0f - rand.NextSingle();
         var rand_std_normal = float.Sqrt(-2.0f * float.Log(u1)) * float.Sin(2.0f * MathF.PI * u2); // random normal(0,1)
         return mean + stdev * rand_std_normal; // random normal(mean,stdDev^2)
     }

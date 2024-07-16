@@ -4,53 +4,62 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace NetML.ML;
 
+[JsonConverter(typeof(VectorConverter))]
 [SkipLocalsInit]
 public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     public string name { get; }
     public int length { get; }
     public float* data { get; }
 
+    public static bool use_accelerate = false;
+
     private int allocated;
 
     public Vector(string name, int length, float* data) {
-        if(length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
-
-        this.name = name;
-        this.length = length;
-        this.data   = data;
-        this.allocated = 0;
-    }
-
-    public Vector(string name, int length) {
-        if(length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
+        if (length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
 
         this.name   = name;
         this.length = length;
-        this.data   = (float*)NativeMemory.AlignedAlloc((UIntPtr)(length * sizeof(float)), 16);
-        this.allocated = 1;
+        this.data   = data;
+        allocated   = 0;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void load(ReadOnlySpan<float> data) {
-        if(data.Length != length) throw new IndexOutOfRangeException($"{data.Length} != {length}");
+    public Vector(string name, int length) {
+        if (length % 2 != 0) throw new ArgumentException($"length must be divisible by 2: {length}");
+
+        this.name   = name;
+        this.length = length;
+        data        = (float*)NativeMemory.AlignedAlloc((UIntPtr)(length * sizeof(float)), 16);
+        allocated   = 1;
+    }
+
+    public void insert(ReadOnlySpan<float> data) {
+        if (data.Length != length) throw new IndexOutOfRangeException($"{data.Length} != {length}");
         data.CopyTo(as_span());
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void clear() => as_span().Clear();
+    public void insert(Vector other) {
+        if (length != other.length) throw new IndexOutOfRangeException($"{length} != {other.length}");
+        other.as_readonly_span().CopyTo(as_span());
+    }
+
+    public void clear() {
+        as_span().Clear();
+    }
 
     public float this[int i] {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get {
-            if((uint)i >= length) throw new IndexOutOfRangeException($"{i} >= {length}");
+            if ((uint)i >= length) throw new IndexOutOfRangeException($"{i} >= {length}");
             return data[i];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set {
-            if((uint)i >= length) throw new IndexOutOfRangeException($"{i} >= {length}");
+            if ((uint)i >= length) throw new IndexOutOfRangeException($"{i} >= {length}");
             data[i] = value;
         }
     }
@@ -58,17 +67,21 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     public static void multiply_elementwise(Vector left, Vector right, Vector result) {
         var left_length = left.length;
 
-        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        if (left_length != right.length) throw new($"vectors must be same size: {left.name} != {right.name}");
 
-        var left_ptr = left.data;
-        var right_ptr = right.data;
-        var result_ptr = result.data;
+        if (use_accelerate) {
+            Accelerate.vDSP_vmul(left.data, 1, right.data, 1, result.data, 1, (uint)left.length);
+        } else {
+            var left_ptr   = left.data;
+            var right_ptr  = right.data;
+            var result_ptr = result.data;
 
-        for (var i = 0; i < left_length; i += 4) {
-            var l = Vector128.Load(left_ptr + i);
-            var r = Vector128.Load(right_ptr + i);
-            var m = l * r;
-            m.Store(result_ptr + i);
+            for (var i = 0; i < left_length; i += 4) {
+                var l = Vector128.Load(left_ptr + i);
+                var r = Vector128.Load(right_ptr + i);
+                var m = l * r;
+                m.Store(result_ptr + i);
+            }
         }
     }
 
@@ -76,35 +89,39 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         // Console.WriteLine($"{name} += {other.name}");
         var length = this.length;
 
-        if(length != other.length) throw new Exception($"vectors must be same size: {name} != {other.name}");
+        if (length != other.length) throw new($"vectors must be same size: {name} != {other.name}");
 
-        var data_ptr = this.data;
-        var other_ptr = other.data;
+        if (use_accelerate) {
+            Accelerate.vDSP_vadd(data, 1, other.data, 1, data, 1, (uint)length);
+        } else {
+            var data_ptr  = data;
+            var other_ptr = other.data;
 
-        int i;
+            int i;
 
-        for (i = 0; i < length - 4; i += 4) {
-            var v = Vector128.Load(data_ptr + i);
-            var o = Vector128.Load(other_ptr + i);
-            var m = v + o;
-            m.Store(data_ptr + i);
-        }
+            for (i = 0; i < length - 4; i += 4) {
+                var v = Vector128.Load(data_ptr + i);
+                var o = Vector128.Load(other_ptr + i);
+                var m = v + o;
+                m.Store(data_ptr + i);
+            }
 
-        // remaining elements if length is not a multiple of vectorSize
-        for (; i < length; i += 2) {
-            var v = Vector64.Load(data_ptr + i);
-            var o = Vector64.Load(other_ptr + i);
-            var m = v + o;
-            m.Store(data_ptr + i);
+            // remaining elements if length is not a multiple of vectorSize
+            for (; i < length; i += 2) {
+                var v = Vector64.Load(data_ptr + i);
+                var o = Vector64.Load(other_ptr + i);
+                var m = v + o;
+                m.Store(data_ptr + i);
+            }
         }
     }
 
     public void add_elementwise_weighted(Vector other, float weight) {
         var length = this.length;
 
-        if(length != other.length) throw new Exception($"vectors must be same size: {name} != {other.name}");
+        if (length != other.length) throw new($"vectors must be same size: {name} != {other.name}");
 
-        var data_ptr = this.data;
+        var data_ptr  = data;
         var other_ptr = other.data;
 
         int i;
@@ -127,7 +144,7 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     }
 
     public static void add_elementwise(Vector left, Vector right, Vector result) {
-        if(left.length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        if (left.length != right.length) throw new($"vectors must be same size: {left.name} != {right.name}");
 
         int i;
 
@@ -150,28 +167,32 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     public static void subtract_elementwise(Vector left, Vector right, Vector result) {
         var left_length = left.length;
 
-        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
-        if(left_length != result.length) throw new Exception($"vectors must be same size: {left.name} != {result.name}");
+        if (left_length != right.length) throw new($"vectors must be same size: {left.name} != {right.name}");
+        if (left_length != result.length) throw new($"vectors must be same size: {left.name} != {result.name}");
 
-        var left_ptr = left.data;
-        var right_ptr = right.data;
-        var result_ptr = result.data;
+        if (use_accelerate) {
+            Accelerate.vDSP_vsub(right.data, 1, left.data, 1, result.data, 1, (uint)left.length);
+        } else {
+            var left_ptr   = left.data;
+            var right_ptr  = right.data;
+            var result_ptr = result.data;
 
-        int i;
+            int i;
 
-        for (i = 0; i < left_length - 4; i += 4) {
-            var l = Vector128.Load(left_ptr + i);
-            var r = Vector128.Load(right_ptr + i);
-            var m = l - r;
-            m.Store(result_ptr + i);
-        }
+            for (i = 0; i < left_length - 4; i += 4) {
+                var l = Vector128.Load(left_ptr + i);
+                var r = Vector128.Load(right_ptr + i);
+                var m = l - r;
+                m.Store(result_ptr + i);
+            }
 
-        // remaining elements if length is not a multiple of vectorSize
-        for (; i < left_length; i += 2) {
-            var l = Vector64.Load(left_ptr + i);
-            var r = Vector64.Load(right_ptr + i);
-            var m = l - r;
-            m.Store(result_ptr + i);
+            // remaining elements if length is not a multiple of vectorSize
+            for (; i < left_length; i += 2) {
+                var l = Vector64.Load(left_ptr + i);
+                var r = Vector64.Load(right_ptr + i);
+                var m = l - r;
+                m.Store(result_ptr + i);
+            }
         }
     }
 
@@ -179,29 +200,49 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         var right_length  = right.length;
         var result_length = result.length;
 
-        if(left.output_count != right_length) throw new Exception($"{left.name} != {right.name}");
-        if(left.input_count != result_length) throw new Exception($"{left.name} != {right.name}");
+        if (left.output_count != right.length || left.input_count != result.length)
+            throw new ArgumentException("Matrix and vector dimensions do not match");
 
-        var left_ptr  = left.data;
-        var right_ptr = right.data;
+        var left_ptr   = left.data;
+        var right_ptr  = right.data;
         var result_ptr = result.data;
 
-        for (var i = 0; i < right_length; i++) {
-            var right_value = right_ptr[i];
-            var sum = Vector128<float>.Zero;
+        if (use_accelerate) {
+            const int CblasRowMajor = 101;
+            const int CblasNoTrans  = 111;
 
-            for (var j = 0; j < result_length; j += 4) {
-                var l = Vector128.Load(left_ptr + i * result_length + j);
-                sum += l * right_value;
+            Accelerate.cblas_sgemv(
+                                   CblasRowMajor, // Row-major order
+                                   CblasNoTrans,  // No transpose
+                                   result_length, // Number of rows in matrix
+                                   right_length,  // Number of columns in matrix
+                                   1.0f,          // Alpha scalar
+                                   left_ptr,      // Matrix data
+                                   right_length,  // Leading dimension of matrix
+                                   right_ptr,     // Input vector
+                                   1,             // Increment for input vector
+                                   0.0f,          // Beta scalar
+                                   result_ptr,    // Output vector
+                                   1              // Increment for output vector
+                                  );
+        } else {
+            for (var i = 0; i < right_length; i++) {
+                var right_value = right_ptr[i];
+                var sum         = Vector128<float>.Zero;
+
+                for (var j = 0; j < result_length; j += 4) {
+                    var l = Vector128.Load(left_ptr + i * result_length + j);
+                    sum += l * right_value;
+                }
+
+                result_ptr[i] = Vector128.Sum(sum);
             }
-
-            result_ptr[i] = Vector128.Sum(sum);
         }
     }
 
     public float sum() {
-        var length = this.length;
-        var data_ptr = this.data;
+        var length   = this.length;
+        var data_ptr = data;
 
         int i;
         var sum = 0f;
@@ -223,7 +264,7 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     public static float mean_squared_error(Vector left, Vector right) {
         var left_length = left.length;
 
-        if(left_length != right.length) throw new Exception($"vectors must be same size: {left.name} != {right.name}");
+        if (left_length != right.length) throw new($"vectors must be same size: {left.name} != {right.name}");
 
         float sum_squared_errors = 0;
 
@@ -259,12 +300,10 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
             if (comp.Equals(Vector128<float>.Zero)) continue;
 
             // If there is a match, find the exact index
-            for (var j = 0; j < Vector128<float>.Count; j++) {
+            for (var j = 0; j < Vector128<float>.Count; j++)
                 // ReSharper disable once CompareOfFloatsByEqualityOperator
-                if (v.GetElement(j) == value) {
+                if (v.GetElement(j) == value)
                     return i + j;
-                }
-            }
         }
 
         return -1;
@@ -276,12 +315,11 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         var max_index = 0;
         var max_value = this[0];
 
-        for (var i = 1; i < length; ++i) {
+        for (var i = 1; i < length; ++i)
             if (this[i] > max_value) {
                 max_value = this[i];
                 max_index = i;
             }
-        }
 
         return max_index;
     }
@@ -291,8 +329,9 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
     public static implicit operator Vector(Span<float> data) => new Vector("temp", data.ToArray());
     public static implicit operator Vector(ReadOnlySpan<float> data) => new Vector("temp", data.ToArray());
 */
-    public override string ToString()
-        => $"{name}[len={length}]";
+    public override string ToString() {
+        return $"{name}[len={length}]";
+    }
 
     public string print() {
         StringBuilder sb = new();
@@ -301,33 +340,38 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
         sb.Append("  ");
         for (var i = 0; i < length; ++i) {
             sb.Append($"{this[i]:N4}, ");
-            if(i % 16 == 0) sb.Append("\n  ");
+            if (i % 16 == 0) sb.Append("\n  ");
         }
 
         return sb.ToString().TrimEnd(',', ' ');
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<float> as_span() => new Span<float>(data, length);
+    public Span<float> as_span()
+        => new(data, length);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ReadOnlySpan<float> as_readonly_span()
+        => new(data, length);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool is_aligned()
         => (nuint)data % 16 == 0;
 
     public IEnumerator<float> GetEnumerator() {
-        for (var i = 0; i < length; ++i) {
-            yield return this[i];
-        }
+        for (var i = 0; i < length; ++i) yield return this[i];
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() {
+        return GetEnumerator();
+    }
 
     private void ReleaseUnmanagedResources() {
         var alloc = Interlocked.CompareExchange(ref allocated, 0, 1);
 
-        if (alloc == 1) {
-            Console.WriteLine($"releasing vector {name}");
+        if (alloc == 1)
+            // Console.WriteLine($"releasing vector {name}");
             NativeMemory.AlignedFree(data);
-        }
     }
 
     public void Dispose() {

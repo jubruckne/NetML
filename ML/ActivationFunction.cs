@@ -6,7 +6,7 @@ namespace NetML.ML;
 [SkipLocalsInit]
 public static class ActivationFunctions {
     public static unsafe void sigmoid(Vector vector) {
-        var ptr = vector.data;
+        var ptr    = vector.data;
         var length = vector.length;
 
         int i;
@@ -14,8 +14,8 @@ public static class ActivationFunctions {
             var v = Vector128.Load(ptr + i);
 
             v = Vector128<float>.One
-                          / (Vector128<float>.One
-                             + Vector128.Exp(-v));
+                / (Vector128<float>.One
+                   + Vector128.Exp(-v));
 
             v.Store(ptr + i);
         }
@@ -35,7 +35,7 @@ public static class ActivationFunctions {
     public static unsafe void sigmoid(Vector source, Vector target) {
         var src_ptr = source.data;
         var tgt_ptr = target.data;
-        var length = source.length;
+        var length  = source.length;
 
         int i;
         for (i = 0; i < length - 4; i += 4) {
@@ -63,7 +63,7 @@ public static class ActivationFunctions {
     public static unsafe void sigmoid_derivative(Vector source, Vector target) {
         var src_ptr = source.data;
         var tgt_ptr = target.data;
-        var length = source.length;
+        var length  = source.length;
 
         int i;
         for (i = 0; i < length - 4; i += 4) {

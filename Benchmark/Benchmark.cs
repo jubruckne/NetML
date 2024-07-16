@@ -25,6 +25,7 @@ public unsafe class VectorLoadBenchmarks {
             data3[i] = i;
         }
     }
+
 /*
     [Benchmark]
     public void LoadVector128_load_aligned() {
@@ -94,14 +95,15 @@ public unsafe class VectorLoadBenchmarks {
 }
 
 public static unsafe class VectorExt {
-    [MethodImpl(MethodImplOptions.AggressiveInlining), SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SkipLocalsInit]
     public static Vector128<float> LoadVector(float* ptr) {
         return *(Vector128<float>*)ptr;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining), SkipLocalsInit]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [SkipLocalsInit]
     public static void StoreVector(Vector128<float> vector, float* ptr) {
         *(Vector128<float>*)ptr = vector;
     }
-
 }

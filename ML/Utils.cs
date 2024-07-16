@@ -1,4 +1,3 @@
 namespace NetML.ML;
 
-public static class Utils {
-}
+public static class Utils {}

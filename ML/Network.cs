@@ -1,26 +1,38 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NetML.ML;
 
+[JsonConverter(typeof(NetworkConverter))]
 [SkipLocalsInit]
 public sealed class Network: IDisposable {
+    public string name { get; }
     public Layer[] layers { get; }
     public Random random { get; }
     public int batch_size { get; }
 
     private readonly Vector gradient;
 
-    public Network(Span<int> layer_sizes, int batch_size) {
-        random = new Random(1337);
-
+    public Network(string name, Span<int> layer_sizes, int batch_size) {
+        this.name = name;
+        this.random = new(1337);
         this.batch_size = batch_size;
-        layers = new Layer[layer_sizes.Length - 1];
+        this.layers          = new Layer[layer_sizes.Length - 1];
         for (var i = 0; i < layers.Length; i++) {
-            layers[i] = new Layer($"l{i}",layer_sizes[i], layer_sizes[i + 1], batch_size);
+            layers[i] = new($"l{i}", layer_sizes[i], layer_sizes[i + 1], batch_size);
             layers[i].initialize_weights(random);
         }
 
-        gradient = new Vector("expected", layers[^1].output_size);
+        gradient = new("expected", layers[^1].output_size);
+    }
+
+    public Network(string name, Layer[] layers, int batch_size) {
+        this.name = name;
+        this.random = new(1337);
+        this.batch_size = batch_size;
+        this.layers = layers;
+        gradient = new("expected", layers[^1].output_size);
     }
 
     public Vector forward(Vector input) {
@@ -37,15 +49,21 @@ public sealed class Network: IDisposable {
         Vector.subtract_elementwise(expected, predicted, gradient);
 
         // Backward propagation
-        for (var i = layers.Length - 1; i >= 0; i--) {
-            gradient = layers[i].backward(gradient);
-        }
+        for (var i = layers.Length - 1; i >= 0; i--) gradient = layers[i].backward(gradient);
     }
 
     public void apply_gradients(float learning_rate, int batch_size) {
-        for (var i = layers.Length - 1; i >= 0; i--) {
-            layers[i].apply_gradients(learning_rate, batch_size);
-        }
+        for (var i = layers.Length - 1; i >= 0; i--) layers[i].apply_gradients(learning_rate, batch_size);
+    }
+
+    public void save_to_file(string filename) {
+        using var file = File.CreateText(filename);
+        file.Write(this.to_json());
+    }
+
+    public static Network load_from_file(string filename) {
+        using var file = File.Open(filename, FileMode.Open);
+        return JsonSerializer.Deserialize<Network>(file)!;
     }
 
     public void Dispose() {

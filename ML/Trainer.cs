@@ -24,30 +24,30 @@ public sealed class Trainer {
                 if (i % 10000 == 0)
                     Console.Write($"\rEpoch {epoch + 1}, sample {i:N0} / {dataset.length:N0}, lr={learning_rate:N4}");
 
-                var input = dataset[i].input;
+                var input  = dataset[i].input;
                 var output = dataset[i].output;
 
                 var predicted = network.forward(input);
 
                 network.backward(predicted, output);
 
-                if (i % mini_batch_size == 0) {
-                    network.apply_gradients(learning_rate, mini_batch_size);
-                }
+                if (i % mini_batch_size == 0) network.apply_gradients(learning_rate, mini_batch_size);
 
                 total_error += Vector.mean_squared_error(predicted, output);
             }
 
-            if (dataset.length % mini_batch_size != 0) {
-                network.apply_gradients(learning_rate, mini_batch_size);
-            }
+            if (dataset.length % mini_batch_size != 0) network.apply_gradients(learning_rate, mini_batch_size);
 
-            Console.WriteLine($"\rEpoch {epoch + 1}, loss: {total_error:N0}, duration {sw.ElapsedMilliseconds:N0} ms       ");
+            Console.WriteLine(
+                              $"\rEpoch {epoch + 1}, loss: {total_error:N0}, duration {sw.ElapsedMilliseconds:N0} ms       "
+                             );
         }
 
         sw.Stop();
 
         double total_samples = epochs * dataset.length;
-        Console.WriteLine($"processed {total_samples} samples at {total_samples / sw.ElapsedMilliseconds:N2} samples/ms");
+        Console.WriteLine(
+                          $"processed {total_samples} samples at {total_samples / sw.ElapsedMilliseconds:N2} samples/ms"
+                         );
     }
 }

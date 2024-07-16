@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace NetML.ML;
 
+[JsonConverter(typeof(LayerConverter))]
 [SkipLocalsInit]
 public sealed class Layer: IDisposable {
     public string name { get; }
@@ -28,22 +30,22 @@ public sealed class Layer: IDisposable {
         // output = rows
         // input = columns
         this.name = name;
-        this.weights = new Matrix("weighs", output_size, input_size);
-        this.biases = new Vector("biases", output_size);
+        weights   = new("weighs", output_size, input_size);
+        biases    = new("biases", output_size);
 
         Console.WriteLine($"Layer {name}... input_size: {input_size}, output_size: {output_size}");
 
-        this.input  = new Vector("inputs", input_size);
-        this.output = new Vector("outputs", output_size);
+        input  = new("inputs", input_size);
+        output = new("outputs", output_size);
         //this.inputs  = new Matrix("inputs", batch_size, input_size);
         //this.outputs = new Matrix("outputs", batch_size, output_size);
 
-        this.output_derivatives = new Vector("derivatives", output_size);
-        this.output_errors = new Vector("errors", output_size);
-        this.input_gradients = new Vector("input_gradients", input_size);
+        output_derivatives = new("derivatives", output_size);
+        output_errors      = new("errors", output_size);
+        input_gradients    = new("input_gradients", input_size);
 
-        this.weight_gradients = new Matrix("weigh_gradients", output_size, input_size);
-        this.bias_gradients  = new Vector("bias_gradients", output_size);
+        weight_gradients = new("weigh_gradients", output_size, input_size);
+        bias_gradients   = new("bias_gradients", output_size);
         weight_gradients.clear();
         bias_gradients.clear();
     }
@@ -52,18 +54,14 @@ public sealed class Layer: IDisposable {
         var scale = (float)Math.Sqrt(2.0 / weights.input_count);
         for (var output_idx = 0; output_idx < weights.output_count; output_idx++) {
             for (var input_idx = 0; input_idx < weights.input_count; input_idx++)
-            {
                 weights[output_idx, input_idx] = (float)(rand.NextDouble() * 2 - 1) * scale;
-            }
         }
 
-        for (var i = 0; i < biases.length; i++) {
-            biases[i] = 0; // Initialize biases to zero
-        }
+        for (var i = 0; i < biases.length; i++) biases[i] = 0; // Initialize biases to zero
     }
 
     public Vector forward(Vector input) {
-        this.input.load(input.as_span());
+        this.input.insert(input.as_span());
 
         Matrix.multiply(weights, input, output);
 
