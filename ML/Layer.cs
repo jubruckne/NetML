@@ -99,8 +99,8 @@ public abstract class Layer: ITrainableLayer, IDisposable {
     }
 
     public void initialize_weights<TInitialization>(Random random) where TInitialization: IInitializer<float> {
-        Operator.apply_inplace<TInitialization>(weights.as_span());
-        Operator.apply_inplace<TInitialization>(biases.as_span());
+        Operator.apply<TInitialization>(weights.as_span());
+        Operator.apply<TInitialization>(biases.as_span());
         weight_gradients.clear();
         bias_gradients.clear();
     }
@@ -138,12 +138,14 @@ public abstract class Layer: ITrainableLayer, IDisposable {
     }
 
     protected abstract void apply_activation(Vector vector);
+    protected abstract void apply_activation_derivation(Vector output, Vector gradient);
 
     public Vector backward(Vector output_gradients) {
         // Console.WriteLine($"\n{name}_backward");
 
         // Calculate the derivative of the outputs
-        ActivationFunctions.sigmoid_derivative(output, output_derivatives);
+        //ActivationFunctions.sigmoid_derivative(output, output_derivatives);
+        apply_activation_derivation(output, output_gradients);
 
         // Calculate the errors for each output node
         Vector.multiply_elementwise(output_gradients, output_derivatives, output_errors);
@@ -190,5 +192,8 @@ public sealed class Layer<TActivation>: Layer
         base(name, input_size, output_size) {}
 
     protected override void apply_activation(Vector vector)
-        => Operator.apply<TActivation>(vector.as_span(), vector.as_span());
+        => Operator.apply<TActivation>(vector.as_readonly_span(), vector.as_span());
+
+    protected override void apply_activation_derivation(Vector output, Vector gradient)
+        => Operator.apply_derivative<TActivation>(output.as_readonly_span(), gradient.as_span());
 }

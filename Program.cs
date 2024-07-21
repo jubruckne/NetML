@@ -23,7 +23,7 @@ var ds = Dataset.load_from_url("https://pjreddie.com/media/files/mnist_train.csv
 var mlp = new Network(
                       ds.name,
                       [
-                          Layer.dense<Operator.Sigmoid>("l1", ds.input_length, 128),
+                          Layer.dense<Operator.Tanh<float>>("l1", ds.input_length, 128),
                           Layer.dense<Operator.Sigmoid>("l2", 128, ds.output_length),
                       ]
                      );

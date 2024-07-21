@@ -47,7 +47,21 @@ public static partial class Operator {
                 var r = Vector128<float>.One / (Vector128<float>.One + Vector128.Exp(-v));
                 return r.As<float, T>();
             }
-            throw new ArgumentException($"unsopported type: {nameof(T)}", nameof(T));
+
+            throw new ArgumentException($"unsupported type: {nameof(T)}", nameof(T));
+        }
+
+        public static T differentiate(T source)
+            => T.One / (T.One + T.Exp(-source));
+
+        public static Vector128<T> differentiate(Vector128<T> arg1) {
+            if(arg1 is Vector128<float> fl)
+                return (Vector128<float>.One / (Vector128<float>.One + Vector128.Exp(-fl))).As<float, T>();
+
+            if (arg1 is Vector128<double> dbl)
+                return (Vector128<double>.One / (Vector128<double>.One + Vector128.Exp(-dbl))).As<double, T>();
+
+            throw new ArgumentException($"unsupported type: {nameof(T)}", nameof(T));
         }
     }
 }

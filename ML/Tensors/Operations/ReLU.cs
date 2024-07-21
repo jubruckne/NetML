@@ -4,7 +4,7 @@ using System.Runtime.Intrinsics;
 namespace NetML.ML;
 
 public static partial class Operator {
-    public readonly struct ReLU<T>: IUnaryOperator<T>, IUnaryStreamOperator<T>
+    public readonly struct ReLU<T>: IUnaryOperator<T>, IUnaryStreamOperator<T>, IActivation<T>
         where T: unmanaged, IFloatingPointIeee754<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }

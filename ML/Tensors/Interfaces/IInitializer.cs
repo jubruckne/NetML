@@ -4,5 +4,5 @@ namespace NetML.ML;
 
 public interface IInitializer;
 
-public interface IInitializer<T>: IInitializer, IUnaryStreamOperator<T>
+public interface IInitializer<T>: IInitializer, INullaryStreamOperator<T>
     where T: unmanaged, INumber<T>;

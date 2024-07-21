@@ -6,7 +6,8 @@ using System.Runtime.Intrinsics.Arm;
 namespace NetML.ML;
 
 public static partial class Operator {
-    public readonly struct Tanh<T>: IUnaryOperator<T>, IUnaryStreamOperator<T> where T: unmanaged, IFloatingPointIeee754<T> {
+    public readonly struct Tanh<T>: IUnaryOperator<T>, IUnaryStreamOperator<T>, IActivation<T>
+        where T: unmanaged, IFloatingPointIeee754<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
         public ITensor<T> target { get; }

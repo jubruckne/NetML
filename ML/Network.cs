@@ -23,6 +23,7 @@ public sealed class Network: IDisposable {
         for (var i = 0; i < layer_sizes.Length - 1; i++) {
             var layer = new Layer<Operator.Sigmoid>($"l{i}", layer_sizes[i], layer_sizes[i + 1]);
             layers.Add(layer);
+            layer.initialize_weights<Operator.RandomUniform<float>>(random);
         }
 
         this.output_layer = new OutputLayer(layer_sizes[^1]);
