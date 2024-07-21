@@ -10,12 +10,15 @@ namespace NetML.ML;
 
 [JsonConverter(typeof(VectorConverter))]
 [SkipLocalsInit]
-public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
+public sealed unsafe class Vector: IDisposable,  ITensor<float>, IEnumerable<float> {
     public string name { get; }
+    public int[] shape { get; }
     public int length { get; }
     public float* data { get; }
 
     public static bool use_accelerate = false;
+
+    int ITensor<float>.linear_length => length;
 
     private int allocated;
 
@@ -24,8 +27,9 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
 
         this.name   = name;
         this.length = length;
+        this.shape = [length];
         this.data   = data;
-        allocated   = 0;
+        this.allocated = 0;
     }
 
     public Vector(string name, int length) {
@@ -33,13 +37,14 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
 
         this.name   = name;
         this.length = length;
-        data        = (float*)NativeMemory.AlignedAlloc((UIntPtr)(length * sizeof(float)), 16);
-        allocated   = 1;
+        this.shape = [length];
+        this.data = (float*)NativeMemory.AlignedAlloc((UIntPtr)(length * sizeof(float)), 16);
+        this.allocated   = 1;
     }
 
-    public void insert(ReadOnlySpan<float> data) {
-        if (data.Length != length) throw new IndexOutOfRangeException($"{data.Length} != {length}");
-        data.CopyTo(as_span());
+    public void insert(ReadOnlySpan<float> array) {
+        if (array.Length != length) throw new IndexOutOfRangeException($"{array.Length} != {length}");
+        array.CopyTo(as_span());
     }
 
     public void insert(Vector other) {
@@ -49,6 +54,20 @@ public sealed unsafe class Vector: IDisposable, IEnumerable<float> {
 
     public void clear() {
         as_span().Clear();
+    }
+
+    float ITensor<float>.this[ReadOnlySpan<int> indices] {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => this[indices[0]];
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => this[indices[0]] = value;
+    }
+
+    public float this[params int[] indices] {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => this[indices[0]];
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => this[indices[0]] = value;
     }
 
     public float this[int i] {

@@ -8,52 +8,55 @@ namespace NetML.ML;
 [SkipLocalsInit]
 public sealed class Network: IDisposable {
     public string name { get; }
-    public Layer[] layers { get; }
+    public List<ITrainableLayer> layers { get; }
+    public InputLayer input_layer { get; }
+    public OutputLayer output_layer { get; }
     public Random random { get; }
-    public int batch_size { get; }
 
-    private readonly Vector gradient;
-
-    public Network(string name, Span<int> layer_sizes, int batch_size) {
+    public Network(string name, Span<int> layer_sizes) {
         this.name = name;
         this.random = new(1337);
-        this.batch_size = batch_size;
-        this.layers          = new Layer[layer_sizes.Length - 1];
-        for (var i = 0; i < layers.Length; i++) {
-            layers[i] = new($"l{i}", layer_sizes[i], layer_sizes[i + 1], batch_size);
-            layers[i].initialize_weights(random);
+        this.layers = new(layer_sizes.Length - 1);
+
+        this.input_layer = new InputLayer(layer_sizes[0]);
+
+        for (var i = 0; i < layer_sizes.Length - 1; i++) {
+            var layer = new Layer<Operator.Sigmoid>($"l{i}", layer_sizes[i], layer_sizes[i + 1]);
+            layers.Add(layer);
         }
 
-        gradient = new("expected", layers[^1].output_size);
+        this.output_layer = new OutputLayer(layer_sizes[^1]);
     }
 
-    public Network(string name, Layer[] layers, int batch_size) {
+    public Network(string name, List<ITrainableLayer> layers) {
         this.name = name;
         this.random = new(1337);
-        this.batch_size = batch_size;
         this.layers = layers;
-        gradient = new("expected", layers[^1].output_size);
+        this.input_layer = new InputLayer(layers[0].input_size);
+        this.output_layer = new OutputLayer(layers[^1].output_size);
+
+        foreach (var layer in layers) {
+            layer.initialize_weights<Operator.RandomUniform<float>>(random);
+        }
     }
 
     public Vector forward(Vector input) {
-        var x = input;
+        var x = input_layer.forward(input);
         foreach (var layer in layers) {
             x = layer.forward(x);
         }
-        return x;
+        return output_layer.forward(x);
     }
 
     public void backward(Vector predicted, Vector expected) {
-        var gradient = this.gradient;
-
-        Vector.subtract_elementwise(expected, predicted, gradient);
+        var gradient = output_layer.backward(predicted, expected);
 
         // Backward propagation
-        for (var i = layers.Length - 1; i >= 0; i--) gradient = layers[i].backward(gradient);
+        for (var i = layers.Count - 1; i >= 0; i--) gradient = layers[i].backward(gradient);
     }
 
     public void apply_gradients(float learning_rate, int batch_size) {
-        for (var i = layers.Length - 1; i >= 0; i--) layers[i].apply_gradients(learning_rate, batch_size);
+        for (var i = layers.Count - 1; i >= 0; i--) layers[i].apply_gradients(learning_rate, batch_size);
     }
 
     public void save_to_file(string filename) {
@@ -67,6 +70,5 @@ public sealed class Network: IDisposable {
     }
 
     public void Dispose() {
-        gradient.Dispose();
     }
 }

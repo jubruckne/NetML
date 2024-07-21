@@ -2,8 +2,8 @@ using System.Numerics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct MatrixMultiplication<T>: IBinaryOperation<T> where T: unmanaged, INumber<T> {
+public static partial class Operator {
+    public readonly struct MatrixMultiplication<T>: IBinaryOperator<T> where T: unmanaged, INumber<T> {
         public string name { get; }
         public ITensorOperand<T> source1 { get; }
         public ITensorOperand<T> source2 { get; }

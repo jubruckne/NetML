@@ -2,8 +2,8 @@ using System.Numerics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct SigmoidDerivative<T>: IUnaryOperation<T> where T: unmanaged, INumber<T> {
+public static partial class Operator {
+    public readonly struct SigmoidDerivative<T>: IUnaryOperator<T> where T: unmanaged, INumber<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
         public ITensor<T> target { get; }

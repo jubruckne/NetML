@@ -5,6 +5,7 @@ namespace NetML.ML;
 public sealed class Tensor<T>: ITensor<T> where T: unmanaged, INumber<T> {
     public string name { get; }
     public int[] shape { get; }
+    public int linear_length { get; }
 
     private readonly T[] array;
     private readonly int[] strides;
@@ -13,7 +14,8 @@ public sealed class Tensor<T>: ITensor<T> where T: unmanaged, INumber<T> {
         this.name = name;
         this.shape = shape;
         this.strides = calculate_strides(shape);
-        this.array = new T[this.shape.Aggregate(1, static (a, b) => a * b)];
+        this.linear_length = this.shape.Aggregate(1, static (a, b) => a * b);
+        this.array = new T[linear_length];
     }
 
     public T this[ReadOnlySpan<int> indices] {
@@ -31,7 +33,11 @@ public sealed class Tensor<T>: ITensor<T> where T: unmanaged, INumber<T> {
         set => this[new ReadOnlySpan<int>(indices)] = value;
     }
 
-    public void clear() => array.AsSpan().Clear();
+    public Span<T> as_span() => array;
+
+    public ReadOnlySpan<T> as_readonly_span() => array;
+
+    public void clear() => as_span().Clear();
 
     private int calculate_index(ReadOnlySpan<int> indices) {
         if (indices.Length != shape.Length)

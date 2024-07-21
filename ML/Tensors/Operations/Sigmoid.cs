@@ -1,9 +1,15 @@
 using System.Numerics;
+using System.Runtime.Intrinsics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct Sigmoid<T>: IUnaryOperation<T>
+public static partial class Operator {
+    public class Sigmoid: Sigmoid<float> {
+        public Sigmoid(ITensorOperand<float> source, ITensor<float> target, string? name = default):
+            base(source, target, name) {}
+    }
+
+    public class Sigmoid<T>: IUnaryOperator<T>, IUnaryStreamOperator<T>, IActivation<T>
         where T: unmanaged, IFloatingPointIeee754<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
@@ -16,15 +22,13 @@ public static partial class Operation {
         }
 
         public void execute() {
+            Console.WriteLine($"Sigmoid: {source.target.name} -> {target.name}");
             var evaluated_source = source.evaluate();
 
-            for (var i = 0; i < target.shape.Aggregate(1, static (a, b) => a * b); i++) {
-                target[i] = sigmoid(evaluated_source[i]);
+            for (var i = 0; i < target.linear_length; i++) {
+                target[i] = apply(evaluated_source[i]);
             }
         }
-
-        private static T sigmoid(T value)
-            => T.One / (T.One + T.Exp(value));
 
         public ITensor<T> evaluate() {
             execute();
@@ -33,6 +37,17 @@ public static partial class Operation {
 
         public override string ToString() {
             return $"{nameof(Sigmoid<T>)} (Name: {name}, Source1: {source.target.name}, Target: {target.name})";
+        }
+
+        public static T apply(T value)
+            => T.One / (T.One + T.Exp(value));
+
+        public static Vector128<T> apply(Vector128<T> value) {
+            if (value is Vector128<float> v) {
+                var r = Vector128<float>.One / (Vector128<float>.One + Vector128.Exp(-v));
+                return r.As<float, T>();
+            }
+            throw new ArgumentException($"unsopported type: {nameof(T)}", nameof(T));
         }
     }
 }

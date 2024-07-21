@@ -2,8 +2,8 @@ using System.Numerics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct Sum<T>: IUnaryOperation<T> where T: unmanaged, INumber<T> {
+public static partial class Operator {
+    public readonly struct Sum<T>: IUnaryOperator<T> where T: unmanaged, INumber<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
         public ITensor<T> target { get; }

@@ -2,8 +2,8 @@ using System.Numerics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct ReLUDerivative<T>: IUnaryOperation<T> where T: unmanaged, IFloatingPointIeee754<T> {
+public static partial class Operator {
+    public readonly struct ReLUDerivative<T>: IUnaryOperator<T> where T: unmanaged, IFloatingPointIeee754<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
         public ITensor<T> target { get; }

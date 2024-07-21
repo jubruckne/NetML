@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace NetML.ML;
 
-public static partial class Operation {
+public static partial class Operator {
     public readonly struct Value<T>: ITensorOperand<T> where T: unmanaged, INumber<T> {
         public string name { get; }
 

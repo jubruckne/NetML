@@ -1,9 +1,12 @@
 using System.Numerics;
+using System.Numerics.Tensors;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.Arm;
 
 namespace NetML.ML;
 
-public static partial class Operation {
-    public readonly struct Tanh<T>: IUnaryOperation<T> where T: unmanaged, IFloatingPointIeee754<T> {
+public static partial class Operator {
+    public readonly struct Tanh<T>: IUnaryOperator<T>, IUnaryStreamOperator<T> where T: unmanaged, IFloatingPointIeee754<T> {
         public string name { get; }
         public ITensorOperand<T> source { get; }
         public ITensor<T> target { get; }
@@ -14,13 +17,11 @@ public static partial class Operation {
             this.name = name ?? $"{target.name} = tanh({source.target.name})";
         }
 
-        private static T tanh(T x) => T.Tanh(x);
-
         public void execute() {
             var evaluated_source = source.evaluate();
 
             for (var i = 0; i < target.shape.Aggregate(1, static (a, b) => a * b); i++) {
-                target[i] = tanh(evaluated_source[i]);
+                target[i] = apply(evaluated_source[i]);
             }
         }
 
@@ -32,5 +33,19 @@ public static partial class Operation {
         public override string ToString() {
             return $"{nameof(Tanh<T>)} (Name: {name}, Source1: {source.target.name}, Target: {target.name})";
         }
+
+        public static T apply(T x)
+            => T.Tanh(x);
+
+        public static Vector128<T> apply(Vector128<T> x)
+            => Vector128.Create(
+                                [
+                                    T.Tan(x[0]),
+                                    T.Tan(x[1]),
+                                    T.Tan(x[2]),
+                                    T.Tan(x[3])
+                                ]
+                               );
+
     }
 }

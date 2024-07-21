@@ -2,22 +2,22 @@ using System.Numerics;
 namespace NetML.ML;
 
 public class ComputationGraph<T> where T: unmanaged, INumber<T> {
-    private readonly List<ITensorOperation<T>> operations;
+    private readonly List<ITensorOperator<T>> operations;
 
     public ComputationGraph() {
         operations = [];
     }
 
-    private ComputationGraph(List<ITensorOperation<T>> operations) {
+    private ComputationGraph(List<ITensorOperator<T>> operations) {
         this.operations = operations;
     }
 
-    public void add(ITensorOperation<T> operation) {
-        operations.Add(operation);
+    public void add(ITensorOperator<T> @operator) {
+        operations.Add(@operator);
     }
 
     public ComputationGraph<T> optimize(IGraphOptimizer<T>[] optimizers) {
-        var optimized = new List<ITensorOperation<T>>(operations);
+        var optimized = new List<ITensorOperator<T>>(operations);
 
         foreach (var optimizer in optimizers) {
             optimized = optimizer.optimize(operations);
@@ -28,7 +28,7 @@ public class ComputationGraph<T> where T: unmanaged, INumber<T> {
 
     public void execute() {
         foreach (var operation in operations) {
-            operation.execute();
+            operation.evaluate();
         }
     }
 

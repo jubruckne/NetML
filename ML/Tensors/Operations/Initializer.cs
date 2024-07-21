@@ -1,4 +1,4 @@
-namespace ML;
+/*namespace ML;
 
 public interface IInitializer {
     void initialize_weights(Span<float> weights, int input_count, int output_count);
@@ -102,4 +102,4 @@ file static class RandomExtensions {
         var randStdNormal = Math.Sqrt(-2.0f * Math.Log(u1)) * Math.Sin(2.0f * Math.PI * u2);
         return mean + stddev * randStdNormal;
     }
-}
+}*/

@@ -3,6 +3,12 @@ using System.Runtime.Intrinsics;
 
 namespace NetML.ML;
 
+public enum ActivationFunction {
+    Sigmoid,
+    ReLU,
+    Tanh
+}
+
 [SkipLocalsInit]
 public static class ActivationFunctions {
     public static unsafe void sigmoid(Vector vector) {
@@ -10,7 +16,7 @@ public static class ActivationFunctions {
         var length = vector.length;
 
         int i;
-        for (i = 0; i < length - 4; i += 4) {
+        for (i = 0; i < length - 8; i += 8) {
             var v = Vector128.Load(ptr + i);
 
             v = Vector128<float>.One

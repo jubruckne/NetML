@@ -21,19 +21,19 @@ public static class Serialization {
 public class NetworkConverter: JsonConverter<Network> {
     private class Data {
         public string name { get; set; }
-        public Layer[] layers { get; set; }
+        public ITrainableLayer[] layers { get; set; }
     }
 
     public override Network Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         var data  = JsonSerializer.Deserialize<Data>(ref reader, options);
-        var network = new Network(data.name, data.layers, 1);
+        var network = new Network(data.name, data.layers.ToList());
         return network;
     }
 
     public override void Write(Utf8JsonWriter writer, Network value, JsonSerializerOptions options) {
         var data = new Data {
                                 name   = value.name,
-                                layers = value.layers
+                                layers = value.layers.ToArray()
                             };
 
         JsonSerializer.Serialize(writer, data, options);
@@ -51,7 +51,7 @@ public class LayerConverter: JsonConverter<Layer> {
 
     public override Layer Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
         var data   = JsonSerializer.Deserialize<Data>(ref reader, options);
-        var layer = new Layer(data.name, data.input_size, data.output_size, 1);
+        var layer = new Layer<Operator.Sigmoid>(data.name, data.input_size, data.output_size);
         layer.weights.insert(data.weights);
         layer.biases.insert(data.biases);
         return layer;
