@@ -9,15 +9,16 @@ public class GGUFFile: IDisposable {
     public ulong tensor_count { get; }
     public ulong metadata_count { get; }
     public Dictionary<string, object> metadata { get; }
-    public List<TensorInfo> tensors { get; }
+    public Dictionary<string, TensorInfo> tensors { get; }
     public uint alignment { get; }
 
     private const uint GGUF_MAGIC = 0x46554747;
-    private readonly Stream stream;
+    private readonly MemoryMappedFile mmf;
+    private readonly MemoryMappedViewAccessor mmf_accessor;
 
-    private GGUFFile(Stream stream) {
-        this.stream = stream;
-        using var reader = new BinaryReader(stream);
+    private GGUFFile(MemoryMappedFile mmf) {
+        this.mmf = mmf;
+        using var reader = new BinaryReader(mmf.CreateViewStream());
 
         var magic   = reader.ReadUInt32();
         if (magic != GGUF_MAGIC) {
@@ -34,13 +35,14 @@ public class GGUFFile: IDisposable {
         metadata       = read_metadata(reader, metadata_count);
         alignment      = get_meta_data_value<uint>("general.alignment", 32);
         tensors        = read_tensor_info(reader, tensor_count, alignment);
+
+        mmf_accessor = mmf.CreateViewAccessor();
     }
 
     public static GGUFFile from_file(string filePath) {
         var mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open);
-        var stream = mmf.CreateViewStream();
 
-        return new GGUFFile(stream);
+        return new GGUFFile(mmf);
     }
 
     private static Dictionary<string, object> read_metadata(BinaryReader reader, ulong count) {
@@ -53,8 +55,8 @@ public class GGUFFile: IDisposable {
         return metadata;
     }
 
-    private static List<TensorInfo> read_tensor_info(BinaryReader reader, ulong count, uint alignment) {
-        var tensors = new List<TensorInfo>();
+    private static Dictionary<string, TensorInfo> read_tensor_info(BinaryReader reader, ulong count, uint alignment) {
+        var tensors = new Dictionary<string, TensorInfo>();
         for (ulong i = 0; i < count; i++) {
             var tensor = new TensorInfo {
                                             name = read_string(reader),
@@ -62,7 +64,7 @@ public class GGUFFile: IDisposable {
                                             type = (GGMLType)reader.ReadUInt32(),
                                             offset = reader.ReadUInt64()
                                         };
-            tensors.Add(tensor);
+            tensors.Add(tensor.name, tensor);
         }
 
         // Align to the specified alignment
@@ -112,9 +114,9 @@ public class GGUFFile: IDisposable {
         return array;
     }
 
-    private static ulong[] read_uint64_array(BinaryReader reader) {
+    private static int[] read_uint64_array(BinaryReader reader) {
         var count = reader.ReadUInt32();
-        return Enumerable.Range(0, (int)count).Select(_ => reader.ReadUInt64()).ToArray();
+        return Enumerable.Range(0, (int)count).Select(_ => (int)reader.ReadUInt64()).ToArray();
     }
 
     private T get_meta_data_value<T>(string key, T defaultValue = default) {
@@ -127,63 +129,73 @@ public class GGUFFile: IDisposable {
         return defaultValue;
     }
 
+    public unsafe NetML.ML2.Tensor<float> load_tensor(string tensor_name) {
+        var tensor = tensors[tensor_name];
+
+        return NetML.ML2.Tensor<float>.create(
+                                              tensor.name,
+                                              load_tensor_data<float>(tensor.name),
+                                              (int)tensor.linear_length,
+                                              tensor.dimensions
+                                             );
+    }
+
+    public unsafe T* load_tensor_data<T>(string tensor_name) where T : unmanaged {
+        var tensor = tensors[tensor_name];
+        var offset    = tensor.offset;
+
+        byte* basePtr = null;
+        mmf_accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref basePtr);
+        return (T*)(basePtr + offset);;
+    }
+
     public void load_tensor_data<T>(string tensor_name, Span<T> target) where T: unmanaged {
-        var tensor = tensors.FirstOrDefault(t => t.name == tensor_name);
-        if (tensor == null) {
-            throw new ArgumentException($"Tensor '{tensor_name}' not found.");
-        }
+        var tensor = tensors[tensor_name];
 
+        using var stream = mmf.CreateViewStream();
         stream.Seek((long)tensor.offset, SeekOrigin.Begin);
-        var data_size = tensor.dimensions.Aggregate((ulong)1, static (a, b) => a * b)
-                       * get_type_size(tensor.type);
 
-        if (data_size != (ulong)target.Length) {
+        if (tensor.linear_length != (ulong)target.Length) {
             throw new InvalidDataException($"Tensor data size mismatch.");
         }
 
         stream.ReadExactly(MemoryMarshal.AsBytes(target));
     }
 
-    private ulong get_type_size(GGMLType type) {
-        switch (type) {
-            case GGMLType.F32: return 4;
-            case GGMLType.F16: return 2;
-            case GGMLType.Q4_0:
-            case GGMLType.Q4_1:
-            case GGMLType.Q5_0:
-            case GGMLType.Q5_1:
-            case GGMLType.Q8_0: return 1;
-            case GGMLType.Q8_1: return 2;
-            case GGMLType.Q2_K:
-            case GGMLType.Q3_K:
-            case GGMLType.Q4_K:
-            case GGMLType.Q5_K:
-            case GGMLType.Q6_K: return 2;
-            case GGMLType.Q8_K: return 8;
-            case GGMLType.I8: return 1;
-            case GGMLType.I16: return 2;
-            case GGMLType.I32: return 4;
-            case GGMLType.I64: return 8;
-            case GGMLType.F64: return 8;
-            default: throw new NotSupportedException($"Unsupported GGML type: {type}");
-        }
-    }
-
     public void Dispose() {
-        stream.Dispose();
+        mmf_accessor.Dispose();
+        mmf.Dispose();
         GC.SuppressFinalize(this);
     }
 }
 
 public sealed class TensorInfo {
     public required string name { get; init; }
-    public required ulong[] dimensions { get; init; }
+    public required int[] dimensions { get; init; }
+
     public required GGMLType type { get; init; }
     public required ulong offset { get; init; }
+    public ulong linear_length => (ulong)(dimensions.Aggregate(1, static (a, b) => a * b) * (int)get_type_size(type));
 
-    public override string ToString() {
-        return $"{name} [{string.Join(',', dimensions)}], {type}, offset: {offset}, length: {dimensions.Length}";
+    private ulong get_type_size(GGMLType type) {
+        return type switch {
+            GGMLType.F32 => 4,
+            GGMLType.F16 => 2,
+            GGMLType.Q4_0 or GGMLType.Q4_1 or GGMLType.Q5_0 or GGMLType.Q5_1 or GGMLType.Q8_0 => 1,
+            GGMLType.Q8_1 => 2,
+            GGMLType.Q2_K or GGMLType.Q3_K or GGMLType.Q4_K or GGMLType.Q5_K or GGMLType.Q6_K => 2,
+            GGMLType.Q8_K => 8,
+            GGMLType.I8 => 1,
+            GGMLType.I16 => 2,
+            GGMLType.I32 => 4,
+            GGMLType.I64 => 8,
+            GGMLType.F64 => 8,
+            _ => throw new NotSupportedException($"Unsupported GGML type: {type}")
+        };
     }
+
+    public override string ToString()
+        => $"{name} [{string.Join(',', dimensions)}], type:{type}, offset:{offset}, length:{linear_length}";
 }
 
 public enum GGMLType : uint {

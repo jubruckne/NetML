@@ -75,9 +75,8 @@ public static unsafe class TensorExtensions {
                   );
     }
 
-    public static Tensor<T> transpose<T, TSelf>(this TSelf tensor)
-        where T: unmanaged, INumber<T>
-        where TSelf: ITensor<T, TSelf> {
+    public static Tensor<T> transpose<T>(this Tensor<T> tensor)
+        where T: unmanaged, INumber<T> {
         if (tensor.rank != 2) {
             throw new InvalidOperationException("Transpose with no parameters operation is only supported for 2D tensors.");
         }

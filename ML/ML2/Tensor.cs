@@ -1,6 +1,5 @@
 using System.Numerics;
 using System.Text;
-using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsTCPIP;
 
 namespace NetML.ML2;
 
@@ -29,6 +28,11 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
 
     public static Tensor<T> create(string name, T* data, int linear_length, int[] shape, int[] strides) {
         return new(name, data, linear_length, shape, strides);
+    }
+
+    public static Tensor<T> create(string name, T* data, int linear_length, int[] shape) {
+        var x = TensorExtensions.calculate_strides(shape);
+        return new(name, data, linear_length, shape, x.strides);
     }
 
     public static Tensor<T> create(string name, T* data, int linear_length, ReadOnlySpan<int> shape, ReadOnlySpan<int> strides) {
@@ -75,23 +79,25 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
     public void print() {
         StringBuilder sb = new StringBuilder();
         sb.AppendLine($"Tensor: {name}[" + string.Join(", ", shape) + "]");
-        sb.Append("Values: ");
+        sb.AppendLine("Values: ");
         print_values(sb, new int[shape.Length], 0);
         Console.WriteLine(sb.ToString());
     }
 
     private void print_values(StringBuilder sb, int[] indices, int dimension) {
         if (dimension == shape.Length) {
-            sb.Append(this[indices] + " ");
+            sb.Append($"{this[indices]:N4} ");
         } else {
             sb.Append("[");
-            for (var i = 0; i < shape[dimension]; i++) {
+            if (dimension == 0) sb.Append("\n ");
+
+            for (var i = 0; i < int.Clamp(shape[dimension], 0, 5); i++) {
                 indices[dimension] = i;
                 print_values(sb, indices, dimension + 1);
             }
 
             sb.Remove(sb.Length - 1, 1);
-            sb.Append("]");
+            sb.AppendLine("]");
             if (dimension > 0) sb.Append(" ");
             if (dimension == 0) sb.AppendLine();
         }
