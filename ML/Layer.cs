@@ -138,14 +138,14 @@ public abstract class Layer: ITrainableLayer, IDisposable {
     }
 
     protected abstract void apply_activation(Vector vector);
-    protected abstract void apply_activation_derivation(Vector output, Vector gradient);
+    protected abstract void apply_activation_derivation(Vector output, Vector derivative);
 
     public Vector backward(Vector output_gradients) {
         // Console.WriteLine($"\n{name}_backward");
 
         // Calculate the derivative of the outputs
         //ActivationFunctions.sigmoid_derivative(output, output_derivatives);
-        apply_activation_derivation(output, output_gradients);
+        apply_activation_derivation(output, output_derivatives);
 
         // Calculate the errors for each output node
         Vector.multiply_elementwise(output_gradients, output_derivatives, output_errors);
@@ -194,6 +194,6 @@ public sealed class Layer<TActivation>: Layer
     protected override void apply_activation(Vector vector)
         => Operator.apply<TActivation>(vector.as_readonly_span(), vector.as_span());
 
-    protected override void apply_activation_derivation(Vector output, Vector gradient)
-        => Operator.apply_derivative<TActivation>(output.as_readonly_span(), gradient.as_span());
+    protected override void apply_activation_derivation(Vector output, Vector derivative)
+        => Operator.apply_derivative<TActivation>(output.as_readonly_span(), derivative.as_span());
 }

@@ -41,10 +41,23 @@ public static partial class Operator {
         public static Vector128<T> apply(Vector128<T> x)
             => Vector128.Create(
                                 [
-                                    T.Tan(x[0]),
-                                    T.Tan(x[1]),
-                                    T.Tan(x[2]),
-                                    T.Tan(x[3])
+                                    T.Tanh(x[0]),
+                                    T.Tanh(x[1]),
+                                    T.Tanh(x[2]),
+                                    T.Tanh(x[3])
+                                ]
+                               );
+
+        public static T differentiate(T x)
+            => T.One - T.Tanh(x) * T.Tanh(x);
+
+        public static Vector128<T> differentiate(Vector128<T> x)
+            => Vector128.Create(
+                                [
+                                    differentiate(x[0]),
+                                    differentiate(x[1]),
+                                    differentiate(x[2]),
+                                    differentiate(x[3])
                                 ]
                                );
 

@@ -9,13 +9,15 @@ public interface ITensorOperand<T> where T: unmanaged, INumber<T> {
     ITensor<T> evaluate() => (ITensor<T>)this;
 }
 
-public interface ITensorOperator<T>: ITensorOperand<T> where T: unmanaged, INumber<T> {
-}
+public interface ITensorOperator<T>: ITensorOperand<T>
+    where T: unmanaged, INumber<T>;
 
-public interface INullaryOperator<T>: ITensorOperator<T> where T: unmanaged, INumber<T> {
-}
+public interface INullaryOperator<T>: ITensorOperator<T>
+    where T: unmanaged, INumber<T>;
 
-public interface INullaryStreamOperator<T>: ITensorOperator<T> where T: unmanaged, INumber<T> {
+public interface INullaryStreamOperator<T>: ITensorOperator<T>
+    where T: unmanaged, INumber<T> {
+
     static abstract T apply_scalar();
     static abstract Vector128<T> apply_vector();
 }

@@ -38,5 +38,13 @@ public static partial class Operator {
 
         public static Vector128<T> apply(Vector128<T> x)
             => Vector128.Max(Vector128<T>.Zero, x);
+
+        public static T differentiate(T x)
+            => x > T.Zero ? T.One : T.Zero;
+
+        public static Vector128<T> differentiate(Vector128<T> x) {
+            var gt = Vector128.GreaterThan(x, Vector128<T>.Zero);
+            return Vector128.ConditionalSelect(gt, Vector128<T>.One, Vector128<T>.Zero);
+        }
     }
 }

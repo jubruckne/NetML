@@ -16,7 +16,7 @@ public static partial class Operator {
         where TStreamOperator: IActivation<float> {
         for (var i = 0; i < source.Length; i += 4) {
             var v      = Vector128.LoadUnsafe(in source[i]);
-            var result = TStreamOperator.apply(v);
+            var result = TStreamOperator.differentiate(v);
             result.StoreUnsafe(ref target[i]);
         }
     }
