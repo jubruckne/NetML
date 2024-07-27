@@ -38,3 +38,13 @@ public sealed class Sigmoid_float_float: UnaryNode {
         TensorPrimitives.Sigmoid(other.as_readonly_span(), target.as_span());
     }
 }
+
+public sealed class Embedding: BinaryNode {
+    protected override string node_name => "embedding";
+
+    public Embedding(Tensor<float> target, GraphNode wte, GraphNode input): base(target, wte, input) {}
+
+    protected override void apply(Tensor<float> target, Tensor<float> left, Tensor<float> right) {
+
+    }
+}

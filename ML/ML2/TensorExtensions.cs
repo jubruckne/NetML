@@ -3,17 +3,35 @@ using System.Numerics;
 namespace NetML.ML2;
 
 public static unsafe class TensorExtensions {
-    public static (int[] shape, int[] strides, int linear_length) calculate_strides(ReadOnlySpan<int> shape) {
+    public static (int[] shape, int[] strides, ulong linear_length) calculate_strides(ReadOnlySpan<int> shape) {
         var strides = new int[shape.Length];
-        strides[shape.Length - 1] = 1;
-        var linear_length = strides[0] * strides[0];
+        strides[^1] = 1;
+        ulong linear_length = 1;
+
+        for (var i = 0; i < shape.Length; i++) {
+            linear_length *= (ulong)shape[i];
+        }
 
         for (var i = shape.Length - 2; i >= 0; i--) {
             strides[i]    =  strides[i + 1] * shape[i + 1];
-            linear_length += strides[i] * strides[i];
         }
 
         return (shape.ToArray(), strides, linear_length);
+    }
+
+    public static int calculate_index(ReadOnlySpan<int> strides, int idx0, int idx1)
+        => idx0 * strides[0] + idx1 * strides[1];
+
+    public static int calculate_index((int[] shape, int[] strides, ulong linear_length) shape, ReadOnlySpan<int> indices) {
+        if (indices.Length != shape.shape.Length)
+            throw new ArgumentException("Incorrect number of indices");
+
+        var index = 0;
+        for (var i = 0; i < indices.Length; i++) {
+            index += indices[i] * shape.strides[i];
+        }
+
+        return index;
     }
 
     public static Tensor<T> reshape<T, TSelf>(this TSelf tensor, params ReadOnlySpan<int> new_shape)
@@ -54,12 +72,12 @@ public static unsafe class TensorExtensions {
 
         var new_shape   = new int[tensor.shape.Length];
         var new_strides = new int[tensor.strides.Length];
-        var new_linear_length = 1;
+        ulong new_linear_length = 1;
 
         for (var i = 0; i < tensor.rank; i++) {
             new_shape[i]   = tensor.shape[permutation[i]];
             new_strides[i] = tensor.strides[permutation[i]];
-            new_linear_length *= new_shape[i];
+            new_linear_length *= (ulong)new_shape[i];
         }
 
         if (new_linear_length != tensor.linear_length) {
@@ -75,7 +93,7 @@ public static unsafe class TensorExtensions {
                   );
     }
 
-    public static Tensor<T> transpose<T>(this Tensor<T> tensor)
+    public static Tensor<T> transpose<T>(Tensor<T> tensor)
         where T: unmanaged, INumber<T> {
         if (tensor.rank != 2) {
             throw new InvalidOperationException("Transpose with no parameters operation is only supported for 2D tensors.");

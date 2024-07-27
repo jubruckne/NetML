@@ -10,7 +10,7 @@ public unsafe interface ITensor<T, out TSelf>
     ReadOnlySpan<int> shape { get; }
     ReadOnlySpan<int> strides { get; }
     int rank { get; }
-    int linear_length { get; }
+    ulong linear_length { get; }
     T this[ReadOnlySpan<int> indices] { get; set; }
     T this[params int[] indices] { get; set; }
     Span<T> as_span();

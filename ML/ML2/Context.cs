@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -20,9 +21,29 @@ public class Context: IDisposable {
         }
     }
 
-    public unsafe Tensor<T> allocate_tensor<T>(string name, ReadOnlySpan<int> shape) where T: unmanaged, INumber<T> {
+    public unsafe Tensor<T> allocate_tensor<T>(string name, IList data)
+        where T: unmanaged, INumber<T> {
+
+        var config = TensorExtensions.calculate_strides([data.Count]);
+        var array  = NativeMemory.AlignedAlloc((UIntPtr)(config.linear_length * sizeof(float)), 16);
+        var tensor = Tensor<T>.create(name, (T*)array, config.linear_length, config.shape, config.strides);
+        allocations.Add(name, (tensor, (nuint)config.linear_length * sizeof(float), (IntPtr)array));
+
+        tensor.clear();
+        tensor.print();
+
+        for (var i = 0; i < data.Count; ++i) {
+            tensor[i] = (T)Convert.ChangeType(data[i], typeof(T))!;
+        }
+
+        return tensor;
+    }
+
+
+    public unsafe Tensor<T> allocate_tensor<T>(string name, ReadOnlySpan<int> shape)
+        where T: unmanaged, INumber<T> {
         var config = TensorExtensions.calculate_strides(shape);
-        var array  = (void*)NativeMemory.AlignedAlloc((UIntPtr)(config.linear_length * sizeof(float)), 16);
+        var array  = NativeMemory.AlignedAlloc((UIntPtr)(config.linear_length * sizeof(float)), 16);
         var tensor = Tensor<T>.create(name, (T*)array, config.linear_length, config.shape, config.strides);
         allocations.Add(name, (tensor, (nuint)config.linear_length * sizeof(float), (IntPtr)array));
         return tensor;

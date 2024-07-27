@@ -12,13 +12,13 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
     ReadOnlySpan<int> ITensor<T, Tensor<T>>.strides => strides;
 
     public int[] shape { get; }
-    public int linear_length { get; }
+    public ulong linear_length { get; }
     public int rank => shape.Length;
 
     private T* data;
     public readonly int[] strides;
 
-    private Tensor(string name, T* data, int linear_length, int[] shape, int[] strides) {
+    private Tensor(string name, T* data, ulong linear_length, int[] shape, int[] strides) {
         this.name          = name;
         this.shape         = shape;
         this.strides       = strides;
@@ -26,16 +26,16 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
         this.data          = data;
     }
 
-    public static Tensor<T> create(string name, T* data, int linear_length, int[] shape, int[] strides) {
+    public static Tensor<T> create(string name, T* data, ulong linear_length, int[] shape, int[] strides) {
         return new(name, data, linear_length, shape, strides);
     }
 
-    public static Tensor<T> create(string name, T* data, int linear_length, int[] shape) {
+    public static Tensor<T> create(string name, T* data, ulong linear_length, int[] shape) {
         var x = TensorExtensions.calculate_strides(shape);
         return new(name, data, linear_length, shape, x.strides);
     }
 
-    public static Tensor<T> create(string name, T* data, int linear_length, ReadOnlySpan<int> shape, ReadOnlySpan<int> strides) {
+    public static Tensor<T> create(string name, T* data, ulong linear_length, ReadOnlySpan<int> shape, ReadOnlySpan<int> strides) {
         return new(name, data, linear_length, shape.ToArray(), strides.ToArray());
     }
 
@@ -57,8 +57,8 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
         set => this[new ReadOnlySpan<int>(indices)] = value;
     }
 
-    public Span<T> as_span() => new(data, linear_length);
-    public ReadOnlySpan<T> as_readonly_span() => new(data, linear_length);
+    public Span<T> as_span() => new(data, checked((int)linear_length));
+    public ReadOnlySpan<T> as_readonly_span() => new(data, checked((int)linear_length));
     public T* data_ptr => data;
     public bool is_continuous => strides[^1] == 1;
 
@@ -104,4 +104,11 @@ public unsafe class Tensor<T>: ITensor<T, Tensor<T>>
     }
 
     public override string ToString() => name;
+
+    public bool has_same_shape(ReadOnlySpan<int> other_shape)
+        => other_shape.SequenceEqual(shape);
+
+    public bool has_same_shape(IEnumerable<int> other_shape)
+        => other_shape.SequenceEqual(shape);
+
 }

@@ -52,6 +52,14 @@ public class Graph: GraphNode {
         nodes.Add(new Sigmoid_float_float(target.target, source));
         return this;
     }
+
+    public void one_hot(GraphNode target, GraphNode source, int dim) {
+       // nodes.Add(new One_Hot_
+    }
+
+    public void embedding(GraphNode target, GraphNode wte, GraphNode input) {
+        nodes.Add(new Embedding(target.target, wte, input));
+    }
 }
 
 public static class GraphExtensions {
