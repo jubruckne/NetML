@@ -11,8 +11,7 @@ public unsafe interface ITensor<T, out TSelf>
     ReadOnlySpan<int> strides { get; }
     int rank { get; }
     ulong linear_length { get; }
-    T this[ReadOnlySpan<int> indices] { get; set; }
-    T this[params int[] indices] { get; set; }
+    T this[params ReadOnlySpan<int> indices] { get; set; }
     Span<T> as_span();
     ReadOnlySpan<T> as_readonly_span();
     T* data_ptr { get; }

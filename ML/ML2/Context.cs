@@ -33,7 +33,7 @@ public class Context: IDisposable {
         tensor.print();
 
         for (var i = 0; i < data.Count; ++i) {
-            tensor[i] = (T)Convert.ChangeType(data[i], typeof(T))!;
+            tensor[[i]] = (T)Convert.ChangeType(data[i], typeof(T))!;
         }
 
         return tensor;

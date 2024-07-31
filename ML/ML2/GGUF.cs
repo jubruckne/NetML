@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.IO.MemoryMappedFiles;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -144,13 +143,8 @@ public static class GGUF {
             return Enumerable.Range(0, (int)count).Select(_ => (int)reader.ReadUInt64()).ToArray();
         }
 
-        private T? get_meta_data_value<T>(string key, T? default_value) {
-            if (metadata.try_get_value(key, out T? value)) {
-                return value;
-            }
-
-            return default_value;
-        }
+        private T? get_meta_data_value<T>(string key, T? default_value)
+            => metadata.try_get_value(key, out T? value) ? value : default_value;
 
         public unsafe NetML.ML2.Tensor<float> load_tensor(string tensor_name) {
             var tensor = tensors[tensor_name];
@@ -173,12 +167,23 @@ public static class GGUF {
             return (T*)(basePtr + offset);
         }
 
-        public unsafe void load_tensor_data<T>(string tensor_name, Tensor<T> target, bool transpose)
+        public unsafe void load_tensor_data<T>(string tensor_name, Tensor<T> target, bool transpose = false)
             where T: unmanaged, INumber<T> {
             var tensor = tensors[tensor_name];
 
-            Console.WriteLine($"loading tensor {target}[{target.shape.join(",")}], length: {target.linear_length:N}");
-            Console.WriteLine($"source: [{tensor.shape.join()}]");
+            if (transpose && target.rank != 2) {
+                throw new Exception($"Only rank 2 tensors can be transposed!");
+            }
+
+            Console.WriteLine($"\nloading tensor {tensor_name} into target {target}");
+            Console.WriteLine($"source: [{tensor.shape.join()}], linear_length: {tensor.linear_length:N0}");
+            Console.WriteLine($"target: [{target.shape.join()}], linear_length: {target.linear_length:N0}");
+            if (tensor.linear_length != target.linear_length) {
+                throw new Exception(
+                                    $"Tensor data size mismatch! {tensor.linear_length:N0} required, but target has {target.linear_length:N0})"
+                                   );
+            }
+
             if (!target.has_same_shape(transpose ? tensor.shape.Reverse() : tensor.shape)) {
                 throw new Exception($"The tensor {tensor_name}:[{tensor.shape.join()}] does not have the required shape:[{target.shape.join()}]");
             }
@@ -187,21 +192,13 @@ public static class GGUF {
             stream.Seek((long)tensor.offset, SeekOrigin.Begin);
 
 
-            Console.WriteLine($"tensor.linear_length: {tensor.linear_length}");
-            Console.WriteLine($"target.linear_length: {target.linear_length}");
-            if (tensor.linear_length != target.linear_length) {
-                throw new InvalidDataException(
-                                               $"Tensor data size mismatch! {tensor.linear_length:N0} required, but target has {target.linear_length:N0})"
-                                              );
-            }
-
             if (transpose) {
                 var data_ptr = load_tensor_data<T>(tensor_name);
                 var source = TensorExtensions.calculate_strides(tensor.shape);
 
                 for (var i = 0; i < tensor.shape[0]; ++i) {
                     for (var j = 0; j < tensor.shape[1]; ++j) {
-                        target[j, i] = data_ptr[TensorExtensions.calculate_index(source.strides, i, j)];
+                        target[[j, i]] = data_ptr[TensorExtensions.calculate_index(source.strides, i, j)];
                     }
                 }
             } else {
@@ -217,7 +214,7 @@ public static class GGUF {
             stream.Seek((long)tensor.offset, SeekOrigin.Begin);
 
             if (tensor.linear_length != (ulong)target.Length) {
-                throw new InvalidDataException($"Tensor data size mismatch.");
+                throw new InvalidDataException($"Tensor data size mismatch. Expected {tensor.linear_length:N0}, but got {target.Length:N0}");
             }
 
             stream.ReadExactly(MemoryMarshal.AsBytes(target));

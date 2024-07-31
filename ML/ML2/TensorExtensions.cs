@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace NetML.ML2;
 
-public static unsafe class TensorExtensions {
+public static unsafe partial class TensorExtensions {
     public static (int[] shape, int[] strides, ulong linear_length) calculate_strides(ReadOnlySpan<int> shape) {
         var strides = new int[shape.Length];
         strides[^1] = 1;
@@ -22,19 +22,7 @@ public static unsafe class TensorExtensions {
     public static int calculate_index(ReadOnlySpan<int> strides, int idx0, int idx1)
         => idx0 * strides[0] + idx1 * strides[1];
 
-    public static int calculate_index((int[] shape, int[] strides, ulong linear_length) shape, ReadOnlySpan<int> indices) {
-        if (indices.Length != shape.shape.Length)
-            throw new ArgumentException("Incorrect number of indices");
-
-        var index = 0;
-        for (var i = 0; i < indices.Length; i++) {
-            index += indices[i] * shape.strides[i];
-        }
-
-        return index;
-    }
-
-    public static Tensor<T> reshape<T, TSelf>(this TSelf tensor, params ReadOnlySpan<int> new_shape)
+    public static Tensor<T> reshape<T, TSelf>(this TSelf tensor, ReadOnlySpan<int> new_shape)
         where T: unmanaged, INumber<T>
         where TSelf: ITensor<T, TSelf> {
 
@@ -53,7 +41,7 @@ public static unsafe class TensorExtensions {
                                );
     }
 
-    public static Tensor<T> permute<T, TSelf>(this TSelf tensor, params ReadOnlySpan<int> permutation)
+    public static Tensor<T> permute<T, TSelf>(this TSelf tensor, ReadOnlySpan<int> permutation)
         where T: unmanaged, INumber<T>
         where TSelf: ITensor<T, TSelf> {
 
@@ -93,24 +81,6 @@ public static unsafe class TensorExtensions {
                   );
     }
 
-    public static Tensor<T> transpose<T>(Tensor<T> tensor)
-        where T: unmanaged, INumber<T> {
-        if (tensor.rank != 2) {
-            throw new InvalidOperationException("Transpose with no parameters operation is only supported for 2D tensors.");
-        }
-
-        var new_shape   = new int[] { tensor.shape[1], tensor.shape[0] };
-        var new_strides = new int[] { tensor.strides[1], tensor.strides[0] };
-
-        return Tensor<T>.create(
-                   $"{tensor.name}_transposed",
-                   tensor.data_ptr,
-                   tensor.linear_length,
-                   new_shape,
-                   new_strides
-                  );
-    }
-
     public static Tensor<T> broadcast_to<T, TSelf>(this TSelf tensor, ReadOnlySpan<int> new_shape)
         where T: unmanaged, INumber<T>
         where TSelf: ITensor<T, TSelf> {
@@ -140,5 +110,25 @@ public static unsafe class TensorExtensions {
                                 new_shape,
                                 new_strides
                                );
+    }
+
+    public static void Deconstruct<T>(this T[] array, out T item1, out T item2, out T item3) {
+        item1 = default!;
+        item2 = default!;
+        item3 = default!;
+
+        if(array.Length != 3) throw new ArgumentException("Array length mismatch. Expected 3 elements!");
+
+        if (array.Length > 2) {
+            item3 = array[2];
+        }
+
+        if (array.Length > 1) {
+            item2 = array[1];
+        }
+
+        if (array.Length > 0) {
+            item1 = array[0];
+        }
     }
 }

@@ -44,7 +44,20 @@ public sealed class Embedding: BinaryNode {
 
     public Embedding(Tensor<float> target, GraphNode wte, GraphNode input): base(target, wte, input) {}
 
-    protected override void apply(Tensor<float> target, Tensor<float> left, Tensor<float> right) {
+    protected override void apply(Tensor<float> x, Tensor<float> wte, Tensor<float> input) {
+        // wte   [50257, 768]
+        // input [1024]
+        // x     [1024, 768]
 
+        Console.WriteLine($"Embedding {x} = ({wte} + {input})");
+        input.print();
+
+        // [context_length, n_embd]
+
+        for (var i = 0; i < (int)input.linear_length; i++) {
+            var tok = input[i];
+            //x.insert()
+
+        }
     }
 }
